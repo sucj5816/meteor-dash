@@ -136,7 +136,7 @@
         <button data-use="repair" title="星尘修复：立刻补回 1 点护盾">❤️ <span>0</span></button>
       </div>
       <div class="overlay" id="startOverlay">
-        <div class="card"><h2>准备起飞？</h2><p>飞船自动开火打掉陨石，收集金色能量晶体和随机掉落的道具。撑得越久，来得越猛。炼狱难度还会有敌机还击。</p><div class="wallet">★ <strong id="menuStars">0</strong><button class="shop-open" id="shopBtn">打开星际商店</button></div><div class="difficulty-label">选择难度</div><div class="difficulty-row"><button class="difficulty-btn" data-difficulty="easy">轻松</button><button class="difficulty-btn selected" data-difficulty="normal">标准</button><button class="difficulty-btn" data-difficulty="hard">困难</button><button class="difficulty-btn" data-difficulty="inferno">炼狱</button></div><button id="startBtn">开始游戏</button></div>
+        <div class="card"><h2>准备起飞？</h2><p>飞船自动开火打掉陨石，收集金色能量晶体。天上会飘下发光道具，碰到就立刻生效。撑得越久，来得越猛。炼狱难度还会有敌机还击。</p><div class="wallet">★ <strong id="menuStars">0</strong><button class="shop-open" id="shopBtn">打开星际商店</button></div><div class="difficulty-label">选择难度</div><div class="difficulty-row"><button class="difficulty-btn" data-difficulty="easy">轻松</button><button class="difficulty-btn selected" data-difficulty="normal">标准</button><button class="difficulty-btn" data-difficulty="hard">困难</button><button class="difficulty-btn" data-difficulty="inferno">炼狱</button></div><button id="startBtn">开始游戏</button></div>
       </div>
       <div class="overlay hide" id="endOverlay">
         <div class="card"><h2 id="endTitle">飞船失联</h2><p>本次航行得分：<strong id="finalScore">0</strong><br>本局获得星星：<strong id="earnedStars">0</strong><br><span id="endHint">再来一次，争取冲上排行榜。</span></p><div class="difficulty-label">下一局难度</div><div class="difficulty-row"><button class="difficulty-btn" data-difficulty="easy">轻松</button><button class="difficulty-btn selected" data-difficulty="normal">标准</button><button class="difficulty-btn" data-difficulty="hard">困难</button><button class="difficulty-btn" data-difficulty="inferno">炼狱</button></div><div class="card-actions"><button id="againBtn">重新起飞</button><button class="shop-open" id="shopFromEndBtn">打开商店</button><button class="shop-close" id="menuBackBtn">回主菜单</button></div></div>
@@ -296,16 +296,28 @@
   function openShop(returnTo) { shopReturn=returnTo; startOverlay.classList.add('hide'); endOverlay.classList.add('hide'); shopOverlay.classList.remove('hide'); document.documentElement.classList.add('shop-open'); updateWallet(); renderShop(); }
   function closeShop() { stopPreview(); shopOverlay.classList.add('hide'); document.documentElement.classList.remove('shop-open'); (shopReturn==='end'?endOverlay:startOverlay).classList.remove('hide'); updateWallet(); }
   function updatePowerupUI() { updateWallet(); powerupButtons.forEach(btn=>btn.classList.toggle('active',active[btn.dataset.use]>0)); }
+  /* 道具真正起作用的地方。点右下角用掉走这里，天上捡到的也走这里——捡到就当场生效。
+     返回一句话说明刚刚发生了什么，好飘在画面上告诉玩家 */
+  function applyPowerup(id) {
+    let how = '';
+    if(id==='magnet'){ active.magnet=Math.min(16,active.magnet+8); how='🧲 磁力核心 · 吸 8 秒'; }
+    else if(id==='laser'){ active.laser=Math.min(12,active.laser+6); how='⚡ 轨道激光 · 打 6 秒'; }
+    else if(id==='slow'){ active.slow=Math.min(12,active.slow+6); how='🌀 时间缓流 · 慢 6 秒'; }
+    else if(id==='double'){ active.double=Math.min(24,active.double+12); how='💎 双倍得分 · 12 秒'; }
+    else if(id==='shield'){ shieldCharges++; how='🛡️ 备用护盾 +1 层'; }
+    else if(id==='repair'){
+      if(lives<3){ lives++; how='❤️ 星尘修复 · 护盾 +1'; } else { score+=30; how='❤️ 护盾已满 · +30 分'; }
+      chip=0; updateHullUI(); burst(ship.x,ship.y,'#83ffca',26);
+      livesEl.textContent='♥'.repeat(Math.max(0,lives))+'♡'.repeat(Math.max(0,3-lives));
+    }
+    updatePowerupUI();
+    return how;
+  }
   function usePowerup(id) {
-    if(state!=='playing' || !inventory[id]) return;
+    if(state!=='playing' || !(inventory[id]>0)) return;
     inventory[id]--;
-    if(id==='magnet') active.magnet=8;
-    if(id==='laser') active.laser=6;
-    if(id==='slow') active.slow=6;
-    if(id==='double') active.double=12;
-    if(id==='shield') shieldCharges++;
-    if(id==='repair'){ lives=Math.min(3,lives+1); chip=0; updateHullUI(); livesEl.textContent='♥'.repeat(lives)+'♡'.repeat(3-lives); burst(ship.x,ship.y,'#83ffca',26); }
-    saveProgress(); updatePowerupUI();
+    toast(applyPowerup(id), ship.x, ship.y-46);
+    saveProgress();
   }
   function reset() { score=0; lives=3; elapsed=0; spawn=0; orbSpawn=0; shake=0; collectedOrbs=0; earnedStars=0; shieldCharges=0; active.magnet=0; active.laser=0; active.slow=0; active.double=0; meteors=[]; orbs=[]; particles=[]; chip=0; fireCd=0; bullets=[]; foeBullets=[]; foes=[]; pickups=[]; toasts=[]; foeSpawn=rnd(4,6); pickupSpawn=rnd(6,10); ship.x=W/2; ship.y=H-90; scoreEl.textContent=0; livesEl.textContent='♥♥♥'; updateHullUI(); updatePowerupUI(); }
   function burst(x,y,color,n=16) { for(let i=0;i<n;i++) particles.push({x,y,vx:rnd(-140,140),vy:rnd(-140,140),life:rnd(.35,.8),max:.8,color,size:rnd(2,5)}); }
@@ -419,10 +431,9 @@
     for(let i=meteors.length-1;i>=0;i--) if(hit(ship,meteors[i])) { const m=meteors.splice(i,1)[0]; if(hitPlayer(m.x,m.y)) return; }
     for(let i=foes.length-1;i>=0;i--) if(hit(ship,foes[i])) { const f=foes.splice(i,1)[0]; if(hitPlayer(f.x,f.y)) return; }
     for(let i=orbs.length-1;i>=0;i--) if(hit(ship,orbs[i])) { const o=orbs.splice(i,1)[0]; collectedOrbs++; score+=25*mult; burst(o.x,o.y,'#ffe36e',18); }
-    /* 吃到掉落道具：直接进背包，想什么时候用点右下角就行 */
+    /* 吃到掉落道具：当场就生效，不是塞进背包等你点。飘一行字告诉你中了什么 */
     for(let i=pickups.length-1;i>=0;i--){ const p=pickups[i]; if(hit(ship,p)){ pickups.splice(i,1);
-      inventory[p.id]=(inventory[p.id]||0)+1; saveProgress(); updatePowerupUI();
-      const it=itemShop.find(s=>s.id===p.id); toast('+1 '+(it?it.name:p.id), p.x, p.y-10); burst(p.x,p.y,'#9df3ff',18); } }
+      toast(applyPowerup(p.id), p.x, p.y-10); burst(p.x,p.y,'#9df3ff',18); } }
     toasts.forEach(t=>{ t.life-=dt; t.y-=28*dt; }); toasts=toasts.filter(t=>t.life>0);
     score += dt*3*mult; scoreEl.textContent=Math.floor(score);   // 撑得越久分越高（原来是 Math.floor(dt*3)，每帧都被抹成 0，等于白算）
     particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.97;p.vy*=.97;p.life-=dt;}); particles=particles.filter(p=>p.life>0); if(particles.length>240) particles.length=240; shake=Math.max(0,shake-dt);
@@ -468,19 +479,25 @@
     toasts.forEach(t=>{ ctx.globalAlpha=Math.min(1,t.life/.5); ctx.font='bold 14px system-ui,sans-serif';
       ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle='#9df3ff'; ctx.fillText(t.text,t.x,t.y); });
     ctx.globalAlpha=1;
-    /* 生效中的增益，压在画面最上面提示一下（缓流/双倍/护盾） */
+    /* 生效中的增益，压在画面最上面提示一下（五种都有，捡到/用掉之后一眼能看见） */
     const badges=[];
-    if(active.slow>0) badges.push(['🌀 缓流 '+Math.ceil(active.slow)+'s','#8fe3ff']);
+    if(active.magnet>0) badges.push(['🧲 磁力 '+Math.ceil(active.magnet)+'s','#8fe3ff']);
+    if(active.laser>0)  badges.push(['⚡ 激光 '+Math.ceil(active.laser)+'s','#aefcff']);
+    if(active.slow>0)   badges.push(['🌀 缓流 '+Math.ceil(active.slow)+'s','#8fe3ff']);
     if(active.double>0) badges.push(['💎 双倍 '+Math.ceil(active.double)+'s','#ffe08a']);
     if(shieldCharges>0) badges.push(['🛡️ '+shieldCharges+' 层','#83ffca']);
     if(badges.length){
+      ctx.save();
+      const step=92, k=Math.min(1,(W-16)/(badges.length*step));   // 五个一起上身时整排缩一点，保证不跑出画面
+      ctx.translate(W/2,20); ctx.scale(k,k);
       ctx.font='13px system-ui,"Segoe UI Emoji",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
       badges.forEach((b,i)=>{
-        const x=W/2+(i-(badges.length-1)/2)*92, y=20;
-        ctx.fillStyle='#0a1330ee'; ctx.fillRect(x-44,y-11,88,22);
-        ctx.strokeStyle=b[1]+'99'; ctx.lineWidth=1; ctx.strokeRect(x-44.5,y-11.5,89,23);
-        ctx.fillStyle=b[1]; ctx.fillText(b[0],x,y);
+        const x=(i-(badges.length-1)/2)*step;
+        ctx.fillStyle='#0a1330ee'; ctx.fillRect(x-44,-11,88,22);
+        ctx.strokeStyle=b[1]+'99'; ctx.lineWidth=1; ctx.strokeRect(x-44.5,-11.5,89,23);
+        ctx.fillStyle=b[1]; ctx.fillText(b[0],x,0);
       });
+      ctx.restore();
     }
     ctx.restore();
   }
