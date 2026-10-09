@@ -18,6 +18,10 @@
     .stat { min-width:86px; padding:8px 12px; border:1px solid var(--line); border-radius:12px; background:var(--panel); text-align:center; backdrop-filter:blur(10px); }
     .stat small { display:block; color:var(--muted); font-size:11px; }
     .stat b { font-size:20px; }
+    /* 机身耐久：炼狱里挨敌机子弹用的。3 发才顶 1 点护盾，所以单独一条细杠，不满的时候一眼能看出来 */
+    .stat .hull { display:none; height:4px; margin:5px auto 0; width:74%; border-radius:2px; background:#ffffff1f; overflow:hidden; }
+    .stat .hull.on { display:block; }
+    .stat .hull i { display:block; height:100%; width:100%; border-radius:2px; background:linear-gradient(90deg,#9fe9ff,#4ddaff); transition:width .12s linear; }
     .game-wrap { position:relative; width:min(940px,100%); margin:auto; border:1px solid #6dbaff44; border-radius:20px; box-shadow:0 0 60px #1d72c522, inset 0 0 30px #6ab8ff08; overflow:hidden; background:#080e22; }
     canvas { display:block; width:100%; aspect-ratio:3 / 2; cursor:crosshair; }
     .overlay { position:absolute; inset:0; display:grid; place-items:center; background:linear-gradient(180deg,#05081755,#050817cc); padding:20px; }
@@ -117,7 +121,7 @@
       <div class="stats">
         <div class="stat"><small>分数</small><b id="score">0</b></div>
         <div class="stat"><small>最高分</small><b id="best">0</b></div>
-        <div class="stat"><small>护盾</small><b id="lives">♥♥♥</b></div>
+        <div class="stat"><small>护盾</small><b id="lives">♥♥♥</b><div class="hull" id="hull"><i id="hullBar"></i></div></div>
         <div class="stat"><small>星星</small><b id="stars">★ 0</b></div>
       </div>
     </div>
@@ -132,7 +136,7 @@
         <button data-use="repair" title="星尘修复：立刻补回 1 点护盾">❤️ <span>0</span></button>
       </div>
       <div class="overlay" id="startOverlay">
-        <div class="card"><h2>准备起飞？</h2><p>驾驶蓝色飞船躲避陨石，收集金色能量晶体。撑得越久，速度越快。</p><div class="wallet">★ <strong id="menuStars">0</strong><button class="shop-open" id="shopBtn">打开星际商店</button></div><div class="difficulty-label">选择难度</div><div class="difficulty-row"><button class="difficulty-btn" data-difficulty="easy">轻松</button><button class="difficulty-btn selected" data-difficulty="normal">标准</button><button class="difficulty-btn" data-difficulty="hard">困难</button><button class="difficulty-btn" data-difficulty="inferno">炼狱</button></div><button id="startBtn">开始游戏</button></div>
+        <div class="card"><h2>准备起飞？</h2><p>飞船自动开火打掉陨石，收集金色能量晶体和随机掉落的道具。撑得越久，来得越猛。炼狱难度还会有敌机还击。</p><div class="wallet">★ <strong id="menuStars">0</strong><button class="shop-open" id="shopBtn">打开星际商店</button></div><div class="difficulty-label">选择难度</div><div class="difficulty-row"><button class="difficulty-btn" data-difficulty="easy">轻松</button><button class="difficulty-btn selected" data-difficulty="normal">标准</button><button class="difficulty-btn" data-difficulty="hard">困难</button><button class="difficulty-btn" data-difficulty="inferno">炼狱</button></div><button id="startBtn">开始游戏</button></div>
       </div>
       <div class="overlay hide" id="endOverlay">
         <div class="card"><h2 id="endTitle">飞船失联</h2><p>本次航行得分：<strong id="finalScore">0</strong><br>本局获得星星：<strong id="earnedStars">0</strong><br><span id="endHint">再来一次，争取冲上排行榜。</span></p><div class="difficulty-label">下一局难度</div><div class="difficulty-row"><button class="difficulty-btn" data-difficulty="easy">轻松</button><button class="difficulty-btn selected" data-difficulty="normal">标准</button><button class="difficulty-btn" data-difficulty="hard">困难</button><button class="difficulty-btn" data-difficulty="inferno">炼狱</button></div><div class="card-actions"><button id="againBtn">重新起飞</button><button class="shop-open" id="shopFromEndBtn">打开商店</button><button class="shop-close" id="menuBackBtn">回主菜单</button></div></div>
@@ -141,7 +145,7 @@
         <div class="card shop-card"><h2>星际商店</h2><p class="shop-subtitle">星星会永久保存。点卡片可预览外观，皮肤买了能换着穿，道具在游戏里点右下角使用。</p><div class="wallet">★ <strong id="shopStars">0</strong></div><div class="shop-preview"><canvas id="preview" width="600" height="210" aria-label="外观预览"></canvas><div class="preview-info"><b id="previewName">极光蓝</b><span id="previewDesc">出厂配色。</span></div></div><div id="shopGrid"></div><button class="shop-close" id="closeShopBtn">返回</button></div>
       </div>
     </section>
-    <div class="tips"><span>电脑：WASD / 方向键 · 手机：按住屏幕拖动飞船</span><span>暂停：P</span><span>收集晶体 +25 · 撞击 -1 护盾</span></div>
+    <div class="tips"><span>电脑：WASD / 方向键 · 手机：按住屏幕拖动飞船</span><span>暂停：P</span><span>飞船自动开火 · 收集晶体 +25 · 撞上陨石 -1 护盾</span></div>
   </main>
 <script>
 (() => {
@@ -150,6 +154,7 @@
   const previewCanvas = document.querySelector('#preview'), previewCtx = previewCanvas.getContext('2d');
   const previewName = document.querySelector('#previewName'), previewDesc = document.querySelector('#previewDesc');
   const scoreEl = document.querySelector('#score'), bestEl = document.querySelector('#best'), livesEl = document.querySelector('#lives');
+  const hullEl = document.querySelector('#hull'), hullBar = document.querySelector('#hullBar');
   const startOverlay = document.querySelector('#startOverlay'), endOverlay = document.querySelector('#endOverlay');
   const shopOverlay = document.querySelector('#shopOverlay'), shopGrid = document.querySelector('#shopGrid');
   const finalScore = document.querySelector('#finalScore'), earnedStarsEl = document.querySelector('#earnedStars'), endTitle = document.querySelector('#endTitle'), endHint = document.querySelector('#endHint');
@@ -210,6 +215,14 @@
   bestEl.textContent = best;
   const ship = { x: W/2, y:H-90, r:18, vx:0, vy:0 };
   let meteors = [], orbs = [], particles = [], starfield = [];
+  /* ---------- 子弹 / 敌机 / 掉落道具 ---------- */
+  const PLAYER_FIRE = 0.22;   // 我方开火间隔（秒）。敌机是 1.6~2.6 秒——比它快 8 倍左右
+  const HULL_MAX = 3;         // 机身耐久：挨 3 发敌机子弹才掉 1 点护盾，比撞陨石轻得多
+  const FOE_HP = 3;           // 敌机要挨 3 发才掉
+  let bullets = [], foeBullets = [], foes = [], pickups = [], toasts = [];
+  let fireCd = 0, foeSpawn = 0, pickupSpawn = 0, chip = 0;   // chip = 已经挨了几发敌机子弹
+  /* 掉落池：便宜好用的多掉点，救命的少掉点 */
+  const PICKUP_POOL = ['magnet','magnet','slow','slow','laser','laser','shield','double','repair'];
   function seedStars() { starfield = []; for (let i=0;i<110;i++) starfield.push({x:Math.random()*W,y:Math.random()*H,z:Math.random()*1.5+.4, tw:Math.random()*6.28}); }
   seedStars();
   const rnd = (a,b) => a + Math.random()*(b-a);
@@ -291,14 +304,35 @@
     if(id==='slow') active.slow=6;
     if(id==='double') active.double=12;
     if(id==='shield') shieldCharges++;
-    if(id==='repair'){ lives=Math.min(3,lives+1); livesEl.textContent='♥'.repeat(lives)+'♡'.repeat(3-lives); burst(ship.x,ship.y,'#83ffca',26); }
+    if(id==='repair'){ lives=Math.min(3,lives+1); chip=0; updateHullUI(); livesEl.textContent='♥'.repeat(lives)+'♡'.repeat(3-lives); burst(ship.x,ship.y,'#83ffca',26); }
     saveProgress(); updatePowerupUI();
   }
-  function reset() { score=0; lives=3; elapsed=0; spawn=0; orbSpawn=0; shake=0; collectedOrbs=0; earnedStars=0; shieldCharges=0; active.magnet=0; active.laser=0; active.slow=0; active.double=0; meteors=[]; orbs=[]; particles=[]; ship.x=W/2; ship.y=H-90; scoreEl.textContent=0; livesEl.textContent='♥♥♥'; updatePowerupUI(); }
+  function reset() { score=0; lives=3; elapsed=0; spawn=0; orbSpawn=0; shake=0; collectedOrbs=0; earnedStars=0; shieldCharges=0; active.magnet=0; active.laser=0; active.slow=0; active.double=0; meteors=[]; orbs=[]; particles=[]; chip=0; fireCd=0; bullets=[]; foeBullets=[]; foes=[]; pickups=[]; toasts=[]; foeSpawn=rnd(4,6); pickupSpawn=rnd(6,10); ship.x=W/2; ship.y=H-90; scoreEl.textContent=0; livesEl.textContent='♥♥♥'; updateHullUI(); updatePowerupUI(); }
   function burst(x,y,color,n=16) { for(let i=0;i<n;i++) particles.push({x,y,vx:rnd(-140,140),vy:rnd(-140,140),life:rnd(.35,.8),max:.8,color,size:rnd(2,5)}); }
-  function addMeteor() { const cfg=difficultyConfigs[difficulty], r=rnd(14,29), speed=(rnd(95,155)+elapsed*2.4)*cfg.speed*vScale; meteors.push({x:rnd(r,W-r),y:-r-10,r,vx:rnd(-28,28)*W/900,vy:speed,rot:rnd(0,7),spin:rnd(-2,2), hue:rnd(8,30)}); }
+  function addMeteor() { const cfg=difficultyConfigs[difficulty], r=rnd(14,29), speed=(rnd(95,155)+elapsed*2.4)*cfg.speed*vScale; meteors.push({x:rnd(r,W-r),y:-r-10,r,vx:rnd(-28,28)*W/900,vy:speed,rot:rnd(0,7),spin:rnd(-2,2), hue:rnd(8,30), hp: r<18?1:(r<24?2:3)}); }   // 越大越抗打，得点掉几发
   function addOrb() { orbs.push({x:rnd(30,W-30),y:-20,r:10,vy:(rnd(75,115)+elapsed*1.4)*vScale,pulse:rnd(0,7)}); }
   function hit(a,b) { return Math.hypot(a.x-b.x,a.y-b.y) < a.r+b.r; }
+  /* ---------- 子弹 / 敌机 / 掉落的几个小工具 ---------- */
+  function updateHullUI() {
+    hullBar.style.width = Math.round((1 - chip/HULL_MAX)*100) + '%';
+    hullEl.classList.toggle('on', difficulty === 'inferno');   // 只有炼狱有敌机，别的难度用不上这条杠
+  }
+  /* 实打实撞一下：有备用护盾先扣护盾，没有就掉 1 点。返回 true 表示这局结束了 */
+  function hitPlayer(x,y) {
+    if (shieldCharges > 0) { shieldCharges--; burst(x,y,'#83ffca',28); updatePowerupUI(); return false; }
+    burst(x,y,'#ff785f',24); lives--; shake=.3; chip=0; updateHullUI();
+    livesEl.textContent='♥'.repeat(Math.max(0,lives))+'♡'.repeat(Math.max(0,3-lives));
+    if (lives<=0) { finish(); return true; }
+    return false;
+  }
+  function toast(text,x,y) { toasts.push({ text, x, y, life:1.4 }); }
+  function dropPickup(x,y) {
+    const id = PICKUP_POOL[Math.floor(Math.random()*PICKUP_POOL.length)];
+    pickups.push({ x: x ?? rnd(40,W-40), y: y ?? -24, r:16, id, vy:62*vScale, t:rnd(0,6) });
+  }
+  function addFoe() {   // 敌机：从上面飞进来，降到半空就横着飘，隔一会儿朝下打一发
+    foes.push({ x:rnd(44,W-44), y:-44, r:22, hp:FOE_HP, vy:80*vScale, targetY:rnd(H*0.14,H*0.42), dir:Math.random()<.5?-1:1, fire:rnd(1.4,2.4) });
+  }
   /* 让"游戏世界"照着画面长：
      - 电脑：还是原来的 900×600，一个像素都不变
      - 手机/平板：世界缩小 1.1 倍（= 屏幕上的一切看起来大 1.1 倍），
@@ -345,13 +379,51 @@
     let ay=(keys.has('ArrowDown')||keys.has('s')?1:0)-(keys.has('ArrowUp')||keys.has('w')?1:0);
     ship.vx += (ax*moveSpeed-ship.vx)*Math.min(1,response*dt); ship.vy += (ay*moveSpeed-ship.vy)*Math.min(1,response*dt);
     ship.vx=clamp(ship.vx,-moveSpeed,moveSpeed); ship.vy=clamp(ship.vy,-moveSpeed,moveSpeed); ship.x=clamp(ship.x+ship.vx*dt,25,W-25); ship.y=clamp(ship.y+ship.vy*dt,35,H-30);
-    spawn-=dt; orbSpawn-=dt; if(spawn<=0){addMeteor();if(Math.random()<cfg.extraChance)addMeteor();spawn=Math.max(cfg.minSpawn,(cfg.spawnBase-elapsed*.008)*cfg.spawnScale);} if(orbSpawn<=0){addOrb();orbSpawn=rnd(1.2,2.4);}
+    /* 出场节奏：陨石、晶体、掉落道具、敌机各管各的计时器 */
+    spawn-=dt; orbSpawn-=dt; pickupSpawn-=dt; foeSpawn-=dt;
+    if(spawn<=0){addMeteor();if(Math.random()<cfg.extraChance)addMeteor();spawn=Math.max(cfg.minSpawn,(cfg.spawnBase-elapsed*.008)*cfg.spawnScale);}
+    if(orbSpawn<=0){addOrb();orbSpawn=rnd(1.2,2.4);}
+    if(pickupSpawn<=0){ if(pickups.length<2) dropPickup(); pickupSpawn=rnd(8,14); }          // 场上最多同时两个，不然满地都是
+    if(difficulty==='inferno' && foeSpawn<=0){ if(foes.length<2) addFoe(); foeSpawn=rnd(5,9); }   // 敌机只在炼狱出
+    /* 自动开火：不用按任何键，专心躲就行 */
+    fireCd-=dt; if(fireCd<=0){ fireCd=PLAYER_FIRE; bullets.push({x:ship.x,y:ship.y-26,r:3.6,vy:-620*vScale}); }
+    /* 我方子弹往上飞：打到陨石削一层血，血掉光就炸；打到敌机同理 */
+    bullets=bullets.filter(b=>{
+      b.y+=b.vy*dt; if(b.y<-24) return false;
+      for(let j=meteors.length-1;j>=0;j--){ const m=meteors[j]; if(hit(b,m)){ m.hp--; burst(b.x,b.y,'#bff4ff',4);
+        if(m.hp<=0){ meteors.splice(j,1); score+=8*mult; burst(m.x,m.y,'#ff9a5f',16); if(Math.random()<.05) dropPickup(m.x,m.y); }
+        return false; } }
+      for(let j=foes.length-1;j>=0;j--){ const f=foes[j]; if(hit(b,f)){ f.hp--; burst(b.x,b.y,'#ffd0c0',6);
+        if(f.hp<=0){ foes.splice(j,1); score+=60*mult; burst(f.x,f.y,'#ff9a5f',26); if(Math.random()<.35) dropPickup(f.x,f.y); }
+        return false; } }
+      return true;
+    });
     meteors.forEach(m=>{m.x+=m.vx*dt*slowK;m.y+=m.vy*dt*slowK;m.rot+=m.spin*dt;});
     orbs.forEach(o=>{if(active.magnet>0){o.x+=(ship.x-o.x)*dt*4.5;o.y+=(ship.y-o.y)*dt*4.5;}o.y+=o.vy*dt*slowK;});
-    if(active.laser>0) for(let i=meteors.length-1;i>=0;i--){const m=meteors[i];if(m.y<ship.y&&Math.abs(m.x-ship.x)<m.r+16){meteors.splice(i,1);score+=10*mult;burst(m.x,m.y,'#aefcff',20);}}
-    meteors=meteors.filter(m=>m.y<H+50); orbs=orbs.filter(o=>o.y<H+30);
-    for(let i=meteors.length-1;i>=0;i--) if(hit(ship,meteors[i])) { const m=meteors.splice(i,1)[0]; if(shieldCharges>0){shieldCharges--;burst(m.x,m.y,'#83ffca',28);updatePowerupUI();continue;} burst(m.x,m.y,'#ff785f',24); lives--; shake=.3; livesEl.textContent='♥'.repeat(lives)+'♡'.repeat(3-lives); if(lives<=0){finish();return;} }
+    /* 掉落的道具慢慢往下飘；开了磁力核心的话也一起吸过来 */
+    pickups.forEach(p=>{ p.t+=dt; if(active.magnet>0){p.x+=(ship.x-p.x)*dt*4.5;p.y+=(ship.y-p.y)*dt*4.5;} p.x+=Math.sin(p.t*2.2)*26*dt; p.y+=p.vy*dt*slowK; });
+    /* 敌机：先降到位，然后左右来回飘，隔 1.6~2.6 秒朝下打一发慢子弹 */
+    foes.forEach(f=>{ if(f.y<f.targetY){ f.y+=f.vy*dt*slowK; }
+      else { f.x+=f.dir*70*vScale*dt*slowK; if(f.x<34){f.x=34;f.dir=1;} if(f.x>W-34){f.x=W-34;f.dir=-1;} }
+      f.fire-=dt; if(f.fire<=0 && f.y>0){ f.fire=rnd(1.6,2.6); foeBullets.push({x:f.x,y:f.y+22,r:4.5,vy:(200+elapsed*.4)*vScale}); } });
+    /* 敌方子弹：速度只有我方子弹的三分之一，挨 3 发才掉 1 点护盾——好躲，也赔得起 */
+    for(let i=foeBullets.length-1;i>=0;i--){ const b=foeBullets[i]; b.y+=b.vy*dt*slowK;
+      if(b.y>H+24){ foeBullets.splice(i,1); continue; }
+      if(hit(ship,b)){ foeBullets.splice(i,1); burst(b.x,b.y,'#ff8a6b',14); shake=Math.max(shake,.14); chip++;
+        if(chip>=HULL_MAX){ chip=0; if(hitPlayer(b.x,b.y)) return; } else updateHullUI(); } }
+    if(active.laser>0){
+      for(let i=meteors.length-1;i>=0;i--){const m=meteors[i];if(m.y<ship.y&&Math.abs(m.x-ship.x)<m.r+16){meteors.splice(i,1);score+=10*mult;burst(m.x,m.y,'#aefcff',20);}}
+      for(let i=foes.length-1;i>=0;i--){const f=foes[i];if(f.y<ship.y&&Math.abs(f.x-ship.x)<f.r+16){foes.splice(i,1);score+=40*mult;burst(f.x,f.y,'#aefcff',24);}} }
+    meteors=meteors.filter(m=>m.y<H+50); orbs=orbs.filter(o=>o.y<H+30); pickups=pickups.filter(p=>p.y<H+30);
+    /* 撞上去才掉护盾：先看有没有备用护盾和机身耐久 */
+    for(let i=meteors.length-1;i>=0;i--) if(hit(ship,meteors[i])) { const m=meteors.splice(i,1)[0]; if(hitPlayer(m.x,m.y)) return; }
+    for(let i=foes.length-1;i>=0;i--) if(hit(ship,foes[i])) { const f=foes.splice(i,1)[0]; if(hitPlayer(f.x,f.y)) return; }
     for(let i=orbs.length-1;i>=0;i--) if(hit(ship,orbs[i])) { const o=orbs.splice(i,1)[0]; collectedOrbs++; score+=25*mult; burst(o.x,o.y,'#ffe36e',18); }
+    /* 吃到掉落道具：直接进背包，想什么时候用点右下角就行 */
+    for(let i=pickups.length-1;i>=0;i--){ const p=pickups[i]; if(hit(ship,p)){ pickups.splice(i,1);
+      inventory[p.id]=(inventory[p.id]||0)+1; saveProgress(); updatePowerupUI();
+      const it=itemShop.find(s=>s.id===p.id); toast('+1 '+(it?it.name:p.id), p.x, p.y-10); burst(p.x,p.y,'#9df3ff',18); } }
+    toasts.forEach(t=>{ t.life-=dt; t.y-=28*dt; }); toasts=toasts.filter(t=>t.life>0);
     score += dt*3*mult; scoreEl.textContent=Math.floor(score);   // 撑得越久分越高（原来是 Math.floor(dt*3)，每帧都被抹成 0，等于白算）
     particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.97;p.vy*=.97;p.life-=dt;}); particles=particles.filter(p=>p.life>0); if(particles.length>240) particles.length=240; shake=Math.max(0,shake-dt);
   }
@@ -361,10 +433,41 @@
     ctx.strokeStyle='#79bfff12';ctx.lineWidth=1; for(let x=30;x<W;x+=60){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();} for(let y=30;y<H;y+=60){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
     starfield.forEach(s=>{s.y += (15+s.z*22)*((state==='playing')?1:0.2)/60;if(s.y>H)s.y=0;ctx.fillStyle=`rgba(190,225,255,${.25+.35*Math.sin(s.tw+elapsed*2)})`;ctx.fillRect(s.x,s.y,s.z*1.8,s.z*1.8);});
     orbs.forEach(o=>{ctx.save();ctx.translate(o.x,o.y);const glow=ctx.createRadialGradient(0,0,1,0,0,22);glow.addColorStop(0,'#fff8a8');glow.addColorStop(1,'#ffd44c00');ctx.fillStyle=glow;ctx.beginPath();ctx.arc(0,0,22,0,7);ctx.fill();ctx.rotate(elapsed*2+o.pulse);ctx.fillStyle='#ffe45f';ctx.beginPath();ctx.moveTo(0,-10);ctx.lineTo(8,0);ctx.lineTo(0,10);ctx.lineTo(-8,0);ctx.closePath();ctx.fill();ctx.restore();});
+    /* 掉落的道具：一个会呼吸的光圈加图标，飘下来的时候一眼能认出来 */
+    pickups.forEach(p=>{ const it=itemShop.find(s=>s.id===p.id); ctx.save(); ctx.translate(p.x,p.y);
+      const pulse=1+Math.sin(elapsed*4+p.t)*.09; ctx.scale(pulse,pulse);
+      const pg=ctx.createRadialGradient(0,0,2,0,0,26); pg.addColorStop(0,'#8fe9ff55'); pg.addColorStop(1,'#8fe9ff00');
+      ctx.fillStyle=pg; ctx.beginPath(); ctx.arc(0,0,26,0,7); ctx.fill();
+      ctx.shadowBlur=16; ctx.shadowColor='#6fd8ff'; ctx.fillStyle='#0d2a4aee'; ctx.strokeStyle='#9df3ff'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(0,0,16,0,7); ctx.fill(); ctx.stroke(); ctx.shadowBlur=0;
+      ctx.font='17px system-ui,"Segoe UI Emoji",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(it?it.icon:'★', 0, 1); ctx.restore(); });
     meteors.forEach(m=>{ctx.save();ctx.translate(m.x,m.y);ctx.rotate(m.rot);ctx.shadowBlur=18;ctx.shadowColor='#ff603f88';ctx.fillStyle=`hsl(${m.hue} 90% 62%)`;ctx.beginPath();for(let i=0;i<8;i++){let a=i*Math.PI/4,rr=m.r*rnd(.78,1.14);ctx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr);}ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#8e2d44';ctx.beginPath();ctx.arc(-m.r*.25,-m.r*.1,m.r*.18,0,7);ctx.fill();ctx.restore();});
+    /* 敌机：尖头朝下的红色小飞机，血少了头顶会露出血条 */
+    foes.forEach(f=>{ ctx.save(); ctx.translate(f.x,f.y);
+      const fg=ctx.createRadialGradient(0,0,2,0,0,34); fg.addColorStop(0,'#ff6a4d66'); fg.addColorStop(1,'#ff6a4d00');
+      ctx.fillStyle=fg; ctx.beginPath(); ctx.arc(0,0,34,0,7); ctx.fill();
+      ctx.shadowBlur=16; ctx.shadowColor='#ff4d3a'; ctx.fillStyle='#ff7a5f';
+      ctx.beginPath(); ctx.moveTo(0,22); ctx.lineTo(16,-15); ctx.lineTo(0,-9); ctx.lineTo(-16,-15); ctx.closePath(); ctx.fill();
+      ctx.shadowBlur=0; ctx.fillStyle='#5c1210'; ctx.beginPath(); ctx.ellipse(0,5,6,8,0,0,7); ctx.fill();
+      ctx.fillStyle='#ffd08a'; ctx.beginPath(); ctx.moveTo(-5,-15); ctx.lineTo(0,-27); ctx.lineTo(5,-15); ctx.closePath(); ctx.fill();
+      if(f.hp<FOE_HP){ ctx.fillStyle='#00000099'; ctx.fillRect(-16,-36,32,4); ctx.fillStyle='#ffd06b'; ctx.fillRect(-16,-36,32*f.hp/FOE_HP,4); }
+      ctx.restore(); });
+    /* 我方子弹（青白小条）和敌方子弹（橘红火球）——颜色分得开，一眼知道哪个能躲哪个是自己打的 */
+    ctx.shadowBlur=10; ctx.shadowColor='#5ee8ff'; ctx.fillStyle='#cdf7ff';
+    bullets.forEach(b=>ctx.fillRect(b.x-1.7,b.y-7,3.4,13));
+    ctx.shadowBlur=0;
+    foeBullets.forEach(b=>{ const bg=ctx.createRadialGradient(b.x,b.y,1,b.x,b.y,13);
+      bg.addColorStop(0,'#fff0c0'); bg.addColorStop(.45,'#ff8a4d'); bg.addColorStop(1,'#ff4d2e00');
+      ctx.fillStyle=bg; ctx.beginPath(); ctx.arc(b.x,b.y,13,0,7); ctx.fill();
+      ctx.fillStyle='#ffd27a'; ctx.beginPath(); ctx.arc(b.x,b.y,4,0,7); ctx.fill(); });
     if(active.laser>0){ctx.save();ctx.globalAlpha=.7;ctx.strokeStyle='#aefcff';ctx.shadowBlur=18;ctx.shadowColor='#57f4ff';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(ship.x,ship.y-16);ctx.lineTo(ship.x,0);ctx.stroke();ctx.globalAlpha=.95;ctx.strokeStyle='#ffffff';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(ship.x,ship.y-16);ctx.lineTo(ship.x,0);ctx.stroke();ctx.restore();}
     particles.forEach(p=>{ctx.globalAlpha=Math.max(0,p.life/p.max);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,7);ctx.fill();});ctx.globalAlpha=1;
     const skin=skinConfigs[currentSkin]||skinConfigs.cyan; ctx.save();ctx.translate(ship.x,ship.y);paintShip(ctx,skin);ctx.restore();
+    /* 吃到东西时飘一行小字告诉你捡到了啥 */
+    toasts.forEach(t=>{ ctx.globalAlpha=Math.min(1,t.life/.5); ctx.font='bold 14px system-ui,sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle='#9df3ff'; ctx.fillText(t.text,t.x,t.y); });
+    ctx.globalAlpha=1;
     /* 生效中的增益，压在画面最上面提示一下（缓流/双倍/护盾） */
     const badges=[];
     if(active.slow>0) badges.push(['🌀 缓流 '+Math.ceil(active.slow)+'s','#8fe3ff']);
