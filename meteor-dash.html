@@ -27,7 +27,9 @@
     button { border:0; border-radius:999px; padding:12px 24px; color:#061124; background:linear-gradient(135deg,#75e5ff,#9d9bff); font-weight:800; font-size:15px; cursor:pointer; box-shadow:0 8px 24px #61d7ff44; transition:.18s transform,.18s filter; }
     button:hover { transform:translateY(-2px); filter:brightness(1.1); }
     .difficulty-label { margin:0 0 8px; color:#91a6c6; font-size:12px; }
-    .difficulty-row { display:flex; justify-content:center; gap:8px; margin:0 0 18px; }
+    .difficulty-row { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin:0 0 18px; }
+    .difficulty-btn[data-difficulty="inferno"] { color:#ffb3a3; border-color:#ff7a5f55; }
+    .difficulty-btn[data-difficulty="inferno"].selected { color:#2a0a06; background:linear-gradient(135deg,#ffb457,#ff5f6d); border-color:transparent; }   /* 炼狱单独给个火烧的颜色 */
     .difficulty-btn { padding:8px 14px; color:#bcd5f6; background:#10254a; border:1px solid #6b9dd844; box-shadow:none; font-size:12px; }
     .difficulty-btn.selected { color:#061124; background:linear-gradient(135deg,#75e5ff,#9d9bff); border-color:transparent; }
     .card-actions { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:8px; }
@@ -130,10 +132,10 @@
         <button data-use="repair" title="星尘修复：立刻补回 1 点护盾">❤️ <span>0</span></button>
       </div>
       <div class="overlay" id="startOverlay">
-        <div class="card"><h2>准备起飞？</h2><p>驾驶蓝色飞船躲避陨石，收集金色能量晶体。撑得越久，速度越快。</p><div class="wallet">★ <strong id="menuStars">0</strong><button class="shop-open" id="shopBtn">打开星际商店</button></div><div class="difficulty-label">选择难度</div><div class="difficulty-row"><button class="difficulty-btn" data-difficulty="easy">轻松</button><button class="difficulty-btn selected" data-difficulty="normal">标准</button><button class="difficulty-btn" data-difficulty="hard">困难</button></div><button id="startBtn">开始游戏</button></div>
+        <div class="card"><h2>准备起飞？</h2><p>驾驶蓝色飞船躲避陨石，收集金色能量晶体。撑得越久，速度越快。</p><div class="wallet">★ <strong id="menuStars">0</strong><button class="shop-open" id="shopBtn">打开星际商店</button></div><div class="difficulty-label">选择难度</div><div class="difficulty-row"><button class="difficulty-btn" data-difficulty="easy">轻松</button><button class="difficulty-btn selected" data-difficulty="normal">标准</button><button class="difficulty-btn" data-difficulty="hard">困难</button><button class="difficulty-btn" data-difficulty="inferno">炼狱</button></div><button id="startBtn">开始游戏</button></div>
       </div>
       <div class="overlay hide" id="endOverlay">
-        <div class="card"><h2 id="endTitle">飞船失联</h2><p>本次航行得分：<strong id="finalScore">0</strong><br>本局获得星星：<strong id="earnedStars">0</strong><br><span id="endHint">再来一次，争取冲上排行榜。</span></p><div class="difficulty-label">下一局难度</div><div class="difficulty-row"><button class="difficulty-btn" data-difficulty="easy">轻松</button><button class="difficulty-btn selected" data-difficulty="normal">标准</button><button class="difficulty-btn" data-difficulty="hard">困难</button></div><div class="card-actions"><button id="againBtn">重新起飞</button><button class="shop-open" id="shopFromEndBtn">打开商店</button><button class="shop-close" id="menuBackBtn">回主菜单</button></div></div>
+        <div class="card"><h2 id="endTitle">飞船失联</h2><p>本次航行得分：<strong id="finalScore">0</strong><br>本局获得星星：<strong id="earnedStars">0</strong><br><span id="endHint">再来一次，争取冲上排行榜。</span></p><div class="difficulty-label">下一局难度</div><div class="difficulty-row"><button class="difficulty-btn" data-difficulty="easy">轻松</button><button class="difficulty-btn selected" data-difficulty="normal">标准</button><button class="difficulty-btn" data-difficulty="hard">困难</button><button class="difficulty-btn" data-difficulty="inferno">炼狱</button></div><div class="card-actions"><button id="againBtn">重新起飞</button><button class="shop-open" id="shopFromEndBtn">打开商店</button><button class="shop-close" id="menuBackBtn">回主菜单</button></div></div>
       </div>
       <div class="overlay hide" id="shopOverlay">
         <div class="card shop-card"><h2>星际商店</h2><p class="shop-subtitle">星星会永久保存。点卡片可预览外观，皮肤买了能换着穿，道具在游戏里点右下角使用。</p><div class="wallet">★ <strong id="shopStars">0</strong></div><div class="shop-preview"><canvas id="preview" width="600" height="210" aria-label="外观预览"></canvas><div class="preview-info"><b id="previewName">极光蓝</b><span id="previewDesc">出厂配色。</span></div></div><div id="shopGrid"></div><button class="shop-close" id="closeShopBtn">返回</button></div>
@@ -200,7 +202,8 @@
   const difficultyConfigs = {
     easy: { label:'轻松', speed:.78, spawnBase:1.04, spawnScale:1.18, minSpawn:.48, extraChance:0 },
     normal: { label:'标准', speed:1, spawnBase:.82, spawnScale:1, minSpawn:.24, extraChance:.08 },
-    hard: { label:'困难', speed:1.36, spawnBase:.66, spawnScale:.82, minSpawn:.16, extraChance:.38 }
+    hard: { label:'困难', speed:1.36, spawnBase:.66, spawnScale:.82, minSpawn:.16, extraChance:.38 },
+    inferno: { label:'炼狱', speed:1.62, spawnBase:.58, spawnScale:.72, minSpawn:.14, extraChance:.62 }   // 比困难再快一大截，而且经常一次掉两颗
   };
   let difficulty = 'normal';
   let state = 'menu', last = 0, score = 0, best = Number(localStorage.getItem('meteorDashBest') || 0), lives = 3, elapsed = 0, spawn = 0, orbSpawn = 0, shake = 0;
@@ -331,7 +334,7 @@
     draw();
   }
   function start() { reset(); state='playing'; gameWrap.classList.add('playing'); startOverlay.classList.add('hide'); endOverlay.classList.add('hide'); last=performance.now(); requestAnimationFrame(loop); }
-  function finish() { state='ended'; gameWrap.classList.remove('playing'); earnedStars=Math.max(1,Math.floor(score/120)+collectedOrbs); stars+=earnedStars; saveProgress(); updateWallet(); best=Math.max(best,Math.floor(score)); localStorage.setItem('meteorDashBest',best); bestEl.textContent=best; finalScore.textContent=Math.floor(score); earnedStarsEl.textContent=earnedStars; endTitle.textContent=score>=1000?'星际传奇': '飞船失联'; endHint.textContent=score>=1000?'你已经成为这片星域的传说。':'再来一次，争取冲上排行榜。'; endOverlay.classList.remove('hide'); }
+  function finish() { state='ended'; gameWrap.classList.remove('playing'); /* 越难星星给得越多，不然没人愿意碰炼狱 */ earnedStars=Math.max(1,Math.round((Math.floor(score/120)+collectedOrbs)*({hard:1.5,inferno:2}[difficulty]||1))); stars+=earnedStars; saveProgress(); updateWallet(); best=Math.max(best,Math.floor(score)); localStorage.setItem('meteorDashBest',best); bestEl.textContent=best; finalScore.textContent=Math.floor(score); earnedStarsEl.textContent=earnedStars; endTitle.textContent=score>=1000?'星际传奇': '飞船失联'; endHint.textContent=score>=1000?'你已经成为这片星域的传说。':'再来一次，争取冲上排行榜。'; endOverlay.classList.remove('hide'); }
   function update(dt) {
     if(state!=='playing') return;
     elapsed += dt; const moveSpeed=320*W/900, response=6, cfg=difficultyConfigs[difficulty];   // 世界越窄飞船越慢，横穿全屏的时间和电脑上一致
