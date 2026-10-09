@@ -30,6 +30,8 @@
     .difficulty-row { display:flex; justify-content:center; gap:8px; margin:0 0 18px; }
     .difficulty-btn { padding:8px 14px; color:#bcd5f6; background:#10254a; border:1px solid #6b9dd844; box-shadow:none; font-size:12px; }
     .difficulty-btn.selected { color:#061124; background:linear-gradient(135deg,#75e5ff,#9d9bff); border-color:transparent; }
+    .card-actions { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:8px; }
+    .card-actions .shop-close { margin-top:0; }
     .wallet { display:flex; align-items:center; justify-content:center; gap:10px; margin:-4px 0 16px; color:#ffe78a; font-size:14px; }
     .shop-open { padding:7px 12px; color:#ffe78a; background:#3f2c58; border:1px solid #ffe78a55; box-shadow:none; font-size:12px; }
     .shop-card { width:min(620px,100%); max-height:min(560px,90vh); overflow:auto; }
@@ -91,7 +93,7 @@
     .touch-ui .overlay { position:fixed; inset:0; padding:12px; background:linear-gradient(180deg,#050817f2,#050817fa); }
     .touch-ui.shop-open .top { display:none; }
     .touch-ui.shop-open .shop-card { max-height:calc(100dvh - 24px); }
-    .touch-ui .card { padding:20px 16px; }
+    .touch-ui .card { padding:20px 16px; max-height:calc(100dvh - 24px); overflow-y:auto; }   /* 卡片高了就自己滚，别顶出屏幕 */
     .touch-ui .card h2 { font-size:24px; }
     .touch-ui .card p { font-size:14px; }
     .touch-ui .shop-card { max-height:92dvh; }
@@ -131,7 +133,7 @@
         <div class="card"><h2>准备起飞？</h2><p>驾驶蓝色飞船躲避陨石，收集金色能量晶体。撑得越久，速度越快。</p><div class="wallet">★ <strong id="menuStars">0</strong><button class="shop-open" id="shopBtn">打开星际商店</button></div><div class="difficulty-label">选择难度</div><div class="difficulty-row"><button class="difficulty-btn" data-difficulty="easy">轻松</button><button class="difficulty-btn selected" data-difficulty="normal">标准</button><button class="difficulty-btn" data-difficulty="hard">困难</button></div><button id="startBtn">开始游戏</button></div>
       </div>
       <div class="overlay hide" id="endOverlay">
-        <div class="card"><h2 id="endTitle">飞船失联</h2><p>本次航行得分：<strong id="finalScore">0</strong><br>本局获得星星：<strong id="earnedStars">0</strong><br><span id="endHint">再来一次，争取冲上排行榜。</span></p><button id="againBtn">重新起飞</button> <button class="shop-open" id="shopFromEndBtn">打开商店</button></div>
+        <div class="card"><h2 id="endTitle">飞船失联</h2><p>本次航行得分：<strong id="finalScore">0</strong><br>本局获得星星：<strong id="earnedStars">0</strong><br><span id="endHint">再来一次，争取冲上排行榜。</span></p><div class="difficulty-label">下一局难度</div><div class="difficulty-row"><button class="difficulty-btn" data-difficulty="easy">轻松</button><button class="difficulty-btn selected" data-difficulty="normal">标准</button><button class="difficulty-btn" data-difficulty="hard">困难</button></div><div class="card-actions"><button id="againBtn">重新起飞</button><button class="shop-open" id="shopFromEndBtn">打开商店</button><button class="shop-close" id="menuBackBtn">回主菜单</button></div></div>
       </div>
       <div class="overlay hide" id="shopOverlay">
         <div class="card shop-card"><h2>星际商店</h2><p class="shop-subtitle">星星会永久保存。点卡片可预览外观，皮肤买了能换着穿，道具在游戏里点右下角使用。</p><div class="wallet">★ <strong id="shopStars">0</strong></div><div class="shop-preview"><canvas id="preview" width="600" height="210" aria-label="外观预览"></canvas><div class="preview-info"><b id="previewName">极光蓝</b><span id="previewDesc">出厂配色。</span></div></div><div id="shopGrid"></div><button class="shop-close" id="closeShopBtn">返回</button></div>
@@ -388,8 +390,11 @@
   }
   function loop(now){const dt=Math.max(0,Math.min(.035,(now-last)/1000));last=now;update(dt);draw();if(state==='playing')requestAnimationFrame(loop);}   // Math.max(0,…)：第一帧的时间戳偶尔比 last 早，不挡一下分数会从 -1 开始
   document.querySelector('#startBtn').onclick=start; document.querySelector('#againBtn').onclick=start;
+  /* 挂了之后想换难度：结束界面直接能选，也能先回主菜单再想 */
+  document.querySelector('#menuBackBtn').onclick=()=>{ state='menu'; reset(); gameWrap.classList.remove('playing'); endOverlay.classList.add('hide'); startOverlay.classList.remove('hide'); draw(); };
   document.querySelector('#shopBtn').onclick=()=>openShop('menu'); document.querySelector('#shopFromEndBtn').onclick=()=>openShop('end'); document.querySelector('#closeShopBtn').onclick=closeShop;
-  document.querySelectorAll('.difficulty-btn').forEach(btn=>btn.addEventListener('click',()=>{difficulty=btn.dataset.difficulty;document.querySelectorAll('.difficulty-btn').forEach(b=>b.classList.toggle('selected',b===btn));}));
+  /* 难度按钮开始界面和结束界面各有一排，按 id 对齐，点哪一排两排都跟着亮 */
+  document.querySelectorAll('.difficulty-btn').forEach(btn=>btn.addEventListener('click',()=>{difficulty=btn.dataset.difficulty;document.querySelectorAll('.difficulty-btn').forEach(b=>b.classList.toggle('selected',b.dataset.difficulty===difficulty));}));
   powerupButtons.forEach(btn=>btn.addEventListener('click',()=>usePowerup(btn.dataset.use)));
   /* 手机操作：手指按住屏幕拖动，飞船跟着手指走。
      用的是"相对拖动"——按下去的那一下飞船不会瞬移到手指底下，而是跟着手指移动多少走多少。
