@@ -2,12 +2,12 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>流星突围 Meteor Dash</title>
   <style>
     :root { --ink:#e9f4ff; --muted:#91a6c6; --panel:rgba(12,22,48,.78); --line:rgba(140,190,255,.18); }
     * { box-sizing:border-box; }
-    body { margin:0; min-height:100vh; display:grid; place-items:center; color:var(--ink); background:#050817; font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif; overflow:hidden; }
+    body { margin:0; min-height:100dvh; display:grid; place-items:center; color:var(--ink); background:#050817; font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif; overflow:hidden; }
     .shell { width:min(100vw, 1100px); padding:20px; }
     .top { display:flex; justify-content:space-between; align-items:end; gap:16px; margin:0 auto 12px; max-width:940px; }
     h1 { margin:0; letter-spacing:.08em; font-size:clamp(24px,4vw,42px); line-height:1; text-shadow:0 0 24px #49b8ff66; }
@@ -53,7 +53,60 @@
     .touch-controls .up { left:45px; top:0; } .touch-controls .left { left:0; top:45px; }
     .touch-controls .right { right:0; top:45px; } .touch-controls .down { left:45px; bottom:0; }
     .hide { display:none; }
-    @media (max-width:650px) { .top { display:block; } .stats { margin-top:14px; justify-content:flex-start; } .tips { flex-direction:column; } .touch-controls { display:block; } }
+    @media (max-width:650px) {
+      /* 手机：不再强制居中，内容按顺序排，放不下可以滚 */
+      body { display:block; overflow:auto; }
+      .shell { display:flex; flex-direction:column; width:100%; min-height:100dvh; padding:10px 12px calc(14px + env(safe-area-inset-bottom,0px)); }
+      .top { display:block; width:100%; margin:0 0 10px; }
+      h1 { font-size:26px; }
+      .subtitle { margin-top:4px; font-size:11px; }
+      .stats { justify-content:flex-start; gap:6px; margin-top:10px; }
+      .stat { flex:1 1 0; min-width:0; padding:6px 8px; }
+      .stat small { font-size:10px; }
+      .stat b { font-size:16px; }
+      .tips { display:none; }
+
+      /* 弹出层改成铺满整屏：卡片放得下，也压不到画布边框、不会被裁掉 */
+      .overlay { position:fixed; inset:0; padding:16px; }
+      .card { padding:22px 18px; }
+      .card h2 { font-size:26px; }
+      .card p { font-size:14px; }
+      .shop-card { max-height:88dvh; }
+      .shop-grid { grid-template-columns:1fr; }
+
+      /* 道具键缩小，挪到右下角的拇指区 */
+      .item-controls { position:fixed; top:auto; right:14px; bottom:calc(16px + env(safe-area-inset-bottom,0px)); flex-direction:column; gap:5px; }
+      .item-controls button { min-width:0; padding:6px 7px; font-size:11px; }
+
+      /* 方向键钉在屏幕底部正中：拇指够得着，也不挡画面 */
+      .touch-controls { position:fixed; left:calc(50% - 66px); bottom:calc(16px + env(safe-area-inset-bottom,0px)); }
+    }
+
+    /* 判断"是不是触屏"用 pointer，不能用宽度——否则手机横屏时方向键会整个消失 */
+    @media (pointer:coarse) {
+      .touch-controls { display:block; }
+      /* 没在玩的时候藏起来，免得压住开始/商店/结算弹窗 */
+      .game-wrap:not(.playing) .touch-controls { visibility:hidden; }
+      .game-wrap:not(.playing) .item-controls { display:none; }
+    }
+
+    /* 手机横屏：画布按"高度"撑满（3:2 靠宽度会超出屏幕被裁），按钮浮在两侧空白处 */
+    @media (pointer:coarse) and (orientation:landscape) {
+      body { display:block; overflow:hidden; height:100dvh; }
+      .shell { display:flex; flex-direction:column; height:100dvh; padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px)); }
+      .top { display:flex; align-items:center; gap:10px; width:100%; margin:0 0 6px; }
+      h1 { font-size:20px; }
+      .subtitle { display:none; }
+      .stats { margin:0 0 0 auto; gap:6px; }
+      .stat { min-width:0; padding:4px 9px; }
+      .stat b { font-size:15px; }
+      .tips { display:none; }
+      .game-wrap { width:min(100%, calc((100dvh - 84px) * 1.5)); margin:auto; }
+      .overlay { position:fixed; inset:0; padding:14px; }
+      .touch-controls { position:fixed; left:16px; bottom:calc(14px + env(safe-area-inset-bottom,0px)); }
+      .item-controls { position:fixed; top:auto; right:16px; bottom:calc(14px + env(safe-area-inset-bottom,0px)); flex-direction:column; gap:5px; }
+      .item-controls button { min-width:0; padding:6px 7px; font-size:11px; }
+    }
   </style>
 </head>
 <body>
@@ -173,8 +226,8 @@
   function addMeteor() { const cfg=difficultyConfigs[difficulty], r=rnd(14,29), speed=(rnd(95,155)+elapsed*2.4)*cfg.speed; meteors.push({x:rnd(r,W-r),y:-r-10,r,vx:rnd(-28,28),vy:speed,rot:rnd(0,7),spin:rnd(-2,2), hue:rnd(8,30)}); }
   function addOrb() { orbs.push({x:rnd(30,W-30),y:-20,r:10,vy:rnd(75,115)+elapsed*1.4,pulse:rnd(0,7)}); }
   function hit(a,b) { return Math.hypot(a.x-b.x,a.y-b.y) < a.r+b.r; }
-  function start() { reset(); state='playing'; startOverlay.classList.add('hide'); endOverlay.classList.add('hide'); last=performance.now(); requestAnimationFrame(loop); }
-  function finish() { state='ended'; earnedStars=Math.max(1,Math.floor(score/120)+collectedOrbs); stars+=earnedStars; saveProgress(); updateWallet(); best=Math.max(best,score); localStorage.setItem('meteorDashBest',best); bestEl.textContent=best; finalScore.textContent=score; earnedStarsEl.textContent=earnedStars; endTitle.textContent=score>=1000?'星际传奇': '飞船失联'; endHint.textContent=score>=1000?'你已经成为这片星域的传说。':'再来一次，争取冲上排行榜。'; endOverlay.classList.remove('hide'); }
+  function start() { reset(); state='playing'; document.querySelector('.game-wrap').classList.add('playing'); startOverlay.classList.add('hide'); endOverlay.classList.add('hide'); last=performance.now(); requestAnimationFrame(loop); }
+  function finish() { state='ended'; document.querySelector('.game-wrap').classList.remove('playing'); earnedStars=Math.max(1,Math.floor(score/120)+collectedOrbs); stars+=earnedStars; saveProgress(); updateWallet(); best=Math.max(best,score); localStorage.setItem('meteorDashBest',best); bestEl.textContent=best; finalScore.textContent=score; earnedStarsEl.textContent=earnedStars; endTitle.textContent=score>=1000?'星际传奇': '飞船失联'; endHint.textContent=score>=1000?'你已经成为这片星域的传说。':'再来一次，争取冲上排行榜。'; endOverlay.classList.remove('hide'); }
   function update(dt) {
     if(state!=='playing') return;
     elapsed += dt; const moveSpeed=320, response=6, cfg=difficultyConfigs[difficulty];
@@ -211,9 +264,9 @@
   powerupButtons.forEach(btn=>btn.addEventListener('click',()=>usePowerup(btn.dataset.use)));
   document.querySelectorAll('.touch-controls button').forEach(btn=>{
     const key=btn.dataset.key;
-    const press=e=>{e.preventDefault();btn.classList.add('active');keys.add(key);};
+    const press=e=>{e.preventDefault();btn.setPointerCapture?.(e.pointerId);btn.classList.add('active');keys.add(key);};
     const release=e=>{e.preventDefault();btn.classList.remove('active');keys.delete(key);};
-    btn.addEventListener('pointerdown',press); btn.addEventListener('pointerup',release); btn.addEventListener('pointercancel',release); btn.addEventListener('pointerleave',release);
+    btn.addEventListener('pointerdown',press); btn.addEventListener('pointerup',release); btn.addEventListener('pointercancel',release); btn.addEventListener('lostpointercapture',release);
   });
   window.addEventListener('keydown',e=>{const k=e.key.length===1?e.key.toLowerCase():e.key;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();if(k==='1')usePowerup('magnet');if(k==='2')usePowerup('shield');if(k==='3')usePowerup('laser');if(k==='p'&&state!=='menu'&&state!=='ended'){state=state==='playing'?'paused':'playing';if(state==='playing'){last=performance.now();requestAnimationFrame(loop);}}keys.add(k);});
   window.addEventListener('keyup',e=>keys.delete(e.key.length===1?e.key.toLowerCase():e.key));
