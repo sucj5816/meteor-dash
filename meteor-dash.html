@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>流星突围 Meteor Dash</title>
+  <!-- 先判断一次要不要"手机铺满"界面，免得打开时先闪一下小方块再变大 -->
+  <script>if(matchMedia('(pointer:coarse)').matches||matchMedia('(hover:none)').matches||(navigator.maxTouchPoints>0&&innerWidth<=820))document.documentElement.classList.add('touch-ui');</script>
   <style>
     :root { --ink:#e9f4ff; --muted:#91a6c6; --panel:rgba(12,22,48,.78); --line:rgba(140,190,255,.18); }
     * { box-sizing:border-box; }
@@ -41,72 +43,67 @@
     .shop-item button { width:100%; padding:8px 10px; font-size:12px; }
     .shop-item button:disabled { color:#91a6c6; background:#263653; box-shadow:none; cursor:default; }
     .shop-close { margin-top:16px; padding:9px 18px; color:#cce5ff; background:#1c3257; box-shadow:none; font-size:13px; }
+
+    /* 商店：顶部预览窗 + 分组卡片 */
+    .shop-preview { margin:0 0 6px; border:1px solid #86bcf033; border-radius:14px; background:radial-gradient(circle at 50% 42%,#17244e,#070c1b 70%); overflow:hidden; }
+    .shop-preview canvas { display:block; width:100%; aspect-ratio:auto; cursor:default; }
+    .preview-info { padding:0 12px 11px; text-align:left; }
+    .preview-info b { display:block; margin-bottom:2px; font-size:14px; }
+    .preview-info span { color:#9fb4d4; font-size:12px; line-height:1.55; }
+    .shop-group-title { margin:16px 0 8px; color:#8fa5c5; font-size:12px; text-align:left; letter-spacing:.04em; }
+    .shop-head { display:flex; align-items:center; gap:7px; margin:0 0 6px; }
+    .shop-head h3 { margin:0; font-size:15px; }
+    .shop-icon { display:grid; place-items:center; flex:0 0 auto; width:26px; height:26px; border-radius:9px; background:#1b3161; font-size:15px; }
+    .shop-icon .dot { width:14px; height:14px; border-radius:50%; }
+    .shop-meta { display:flex; justify-content:space-between; align-items:center; margin:0 0 9px; color:#8fa5c5; font-size:12px; }
+    .shop-item.selected { border-color:#8fd8ff88; background:#152f5acc; }
     .item-controls { position:absolute; top:16px; right:16px; display:flex; gap:6px; z-index:3; }
     .item-controls button { min-width:54px; padding:7px 8px; color:#e9f7ff; background:#142f5bcc; border:1px solid #91dcff55; box-shadow:0 4px 14px #0005; font-size:12px; touch-action:manipulation; }
     .item-controls button.active { color:#061124; background:linear-gradient(135deg,#ffe77c,#ff9f76); }
     .laser-beam { pointer-events:none; }
     .tips { max-width:940px; margin:12px auto 0; display:flex; justify-content:space-between; gap:12px; color:#8fa5c5; font-size:12px; }
     .tips span { padding:7px 10px; border:1px solid var(--line); border-radius:9px; background:#0b1630aa; }
-    .touch-controls { display:none; position:absolute; left:16px; bottom:16px; width:132px; height:132px; z-index:3; user-select:none; touch-action:none; }
-    .touch-controls button { position:absolute; width:42px; height:42px; padding:0; border:1px solid #b6eaff66; color:#e8fbff; background:#183b70bb; box-shadow:0 4px 14px #0005; font-size:22px; line-height:1; touch-action:none; -webkit-tap-highlight-color:transparent; }
-    .touch-controls button:active, .touch-controls button.active { background:#4aa9dccc; transform:scale(.94); }
-    .touch-controls .up { left:45px; top:0; } .touch-controls .left { left:0; top:45px; }
-    .touch-controls .right { right:0; top:45px; } .touch-controls .down { left:45px; bottom:0; }
     .hide { display:none; }
-    @media (max-width:650px) {
-      /* 手机：不再强制居中，内容按顺序排，放不下可以滚 */
-      body { display:block; overflow:auto; }
-      .shell { display:flex; flex-direction:column; width:100%; min-height:100dvh; padding:10px 12px calc(14px + env(safe-area-inset-bottom,0px)); }
-      .top { display:block; width:100%; margin:0 0 10px; }
-      h1 { font-size:26px; }
-      .subtitle { margin-top:4px; font-size:11px; }
-      .stats { justify-content:flex-start; gap:6px; margin-top:10px; }
-      .stat { flex:1 1 0; min-width:0; padding:6px 8px; }
-      .stat small { font-size:10px; }
-      .stat b { font-size:16px; }
-      .tips { display:none; }
+    /* ===== 手机 / 窄窗口：游戏铺满整屏 =====
+       顶上一行数据、中间整块画面、底下一行道具键，全部加起来占满屏幕。
+       这个 .touch-ui 是脚本给 <html> 加的（不只看 pointer:coarse——万一手机上判断失灵，
+       还能按"窗口窄"兜底，免得又变回中间那一小块）。 */
+    .touch-ui, .touch-ui body { height:100%; overflow:hidden; }
+    .touch-ui body { display:block; }
+    .touch-ui .shell { display:flex; flex-direction:column; width:100%; height:100dvh; padding:0 0 env(safe-area-inset-bottom,0px); }
 
-      /* 弹出层改成铺满整屏：卡片放得下，也压不到画布边框、不会被裁掉 */
-      .overlay { position:fixed; inset:0; padding:16px; }
-      .card { padding:22px 18px; }
-      .card h2 { font-size:26px; }
-      .card p { font-size:14px; }
-      .shop-card { max-height:88dvh; }
-      .shop-grid { grid-template-columns:1fr; }
+    /* 顶栏：标题让位给画面，只留四个数据排一行 */
+    .touch-ui .top { display:block; flex:0 0 auto; width:100%; margin:0; padding:calc(5px + env(safe-area-inset-top,0px)) 8px 5px; }
+    .touch-ui .top > div:first-child { display:none; }
+    .touch-ui .stats { display:flex; gap:6px; margin:0; }
+    .touch-ui .stat { flex:1 1 0; min-width:0; padding:4px; }
+    .touch-ui .stat small { font-size:10px; }
+    .touch-ui .stat b { font-size:16px; }
+    .touch-ui .tips { display:none; }
 
-      /* 道具键缩小，挪到右下角的拇指区 */
-      .item-controls { position:fixed; top:auto; right:14px; bottom:calc(16px + env(safe-area-inset-bottom,0px)); flex-direction:column; gap:5px; }
-      .item-controls button { min-width:0; padding:6px 7px; font-size:11px; }
+    /* 画面：吃掉顶栏以外剩下的全部高度，只留底下 56px 给道具键 */
+    .touch-ui .game-wrap { flex:1 1 auto; width:100%; min-height:0; border:0; border-radius:0; touch-action:none; }
+    .touch-ui canvas#game { width:100%; height:calc(100% - 56px); aspect-ratio:auto; }
 
-      /* 方向键钉在屏幕底部正中：拇指够得着，也不挡画面 */
-      .touch-controls { position:fixed; left:calc(50% - 66px); bottom:calc(16px + env(safe-area-inset-bottom,0px)); }
-    }
+    /* 弹窗永远铺满整屏，压在最上面 */
+    /* 铺满屏幕时，弹窗会盖到顶部那排数字上，所以给弹窗背景刷厚一点，别透出半截数字；
+       商店那个卡片特别高，干脆把顶上那排数字收掉，卡片也能多占点地方 */
+    .touch-ui .overlay { position:fixed; inset:0; padding:12px; background:linear-gradient(180deg,#050817f2,#050817fa); }
+    .touch-ui.shop-open .top { display:none; }
+    .touch-ui.shop-open .shop-card { max-height:calc(100dvh - 24px); }
+    .touch-ui .card { padding:20px 16px; }
+    .touch-ui .card h2 { font-size:24px; }
+    .touch-ui .card p { font-size:14px; }
+    .touch-ui .shop-card { max-height:92dvh; }
+    .touch-ui .shop-grid { grid-template-columns:1fr; }
 
-    /* 判断"是不是触屏"用 pointer，不能用宽度——否则手机横屏时方向键会整个消失 */
-    @media (pointer:coarse) {
-      .touch-controls { display:block; }
-      /* 没在玩的时候藏起来，免得压住开始/商店/结算弹窗 */
-      .game-wrap:not(.playing) .touch-controls { visibility:hidden; }
-      .game-wrap:not(.playing) .item-controls { display:none; }
-    }
+    /* 道具键：底部一整行，六个平分宽度，拇指横扫就能点到 */
+    .touch-ui .item-controls { position:absolute; top:auto; left:8px; right:8px; bottom:8px; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:5px; }
+    .touch-ui .item-controls button { min-width:0; padding:9px 2px; font-size:15px; }
+    .touch-ui .item-controls button span { display:block; font-size:11px; }
 
-    /* 手机横屏：画布按"高度"撑满（3:2 靠宽度会超出屏幕被裁），按钮浮在两侧空白处 */
-    @media (pointer:coarse) and (orientation:landscape) {
-      body { display:block; overflow:hidden; height:100dvh; }
-      .shell { display:flex; flex-direction:column; height:100dvh; padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px)); }
-      .top { display:flex; align-items:center; gap:10px; width:100%; margin:0 0 6px; }
-      h1 { font-size:20px; }
-      .subtitle { display:none; }
-      .stats { margin:0 0 0 auto; gap:6px; }
-      .stat { min-width:0; padding:4px 9px; }
-      .stat b { font-size:15px; }
-      .tips { display:none; }
-      .game-wrap { width:min(100%, calc((100dvh - 84px) * 1.5)); margin:auto; }
-      .overlay { position:fixed; inset:0; padding:14px; }
-      .touch-controls { position:fixed; left:16px; bottom:calc(14px + env(safe-area-inset-bottom,0px)); }
-      .item-controls { position:fixed; top:auto; right:16px; bottom:calc(14px + env(safe-area-inset-bottom,0px)); flex-direction:column; gap:5px; }
-      .item-controls button { min-width:0; padding:6px 7px; font-size:11px; }
-    }
+    /* 没开局时藏起来，免得压住开始/商店/结算弹窗 */
+    .touch-ui .game-wrap:not(.playing) .item-controls { display:none; }
   </style>
 </head>
 <body>
@@ -122,16 +119,13 @@
     </div>
     <section class="game-wrap">
       <canvas id="game" width="900" height="600" aria-label="流星突围游戏区域"></canvas>
-      <div class="touch-controls" aria-label="手机移动控制">
-        <button class="up" data-key="ArrowUp" aria-label="向上">▲</button>
-        <button class="left" data-key="ArrowLeft" aria-label="向左">◀</button>
-        <button class="right" data-key="ArrowRight" aria-label="向右">▶</button>
-        <button class="down" data-key="ArrowDown" aria-label="向下">▼</button>
-      </div>
       <div class="item-controls" aria-label="游戏道具">
-        <button data-use="magnet" title="磁铁：吸引能量晶体">🧲 <span id="magnetCount">0</span></button>
-        <button data-use="shield" title="护盾：抵挡一次撞击">🛡️ <span id="shieldCount">0</span></button>
-        <button data-use="laser" title="激光：持续清除陨石">⚡ <span id="laserCount">0</span></button>
+        <button data-use="magnet" title="磁力核心：8 秒内自动吸引能量晶体">🧲 <span>0</span></button>
+        <button data-use="shield" title="备用护盾：立刻多一层护盾">🛡️ <span>0</span></button>
+        <button data-use="laser" title="轨道激光：6 秒内自动打掉前方陨石">⚡ <span>0</span></button>
+        <button data-use="slow" title="时间缓流：6 秒内陨石速度减半">🌀 <span>0</span></button>
+        <button data-use="double" title="双倍得分：12 秒内得分翻倍">💎 <span>0</span></button>
+        <button data-use="repair" title="星尘修复：立刻补回 1 点护盾">❤️ <span>0</span></button>
       </div>
       <div class="overlay" id="startOverlay">
         <div class="card"><h2>准备起飞？</h2><p>驾驶蓝色飞船躲避陨石，收集金色能量晶体。撑得越久，速度越快。</p><div class="wallet">★ <strong id="menuStars">0</strong><button class="shop-open" id="shopBtn">打开星际商店</button></div><div class="difficulty-label">选择难度</div><div class="difficulty-row"><button class="difficulty-btn" data-difficulty="easy">轻松</button><button class="difficulty-btn selected" data-difficulty="normal">标准</button><button class="difficulty-btn" data-difficulty="hard">困难</button></div><button id="startBtn">开始游戏</button></div>
@@ -140,40 +134,66 @@
         <div class="card"><h2 id="endTitle">飞船失联</h2><p>本次航行得分：<strong id="finalScore">0</strong><br>本局获得星星：<strong id="earnedStars">0</strong><br><span id="endHint">再来一次，争取冲上排行榜。</span></p><button id="againBtn">重新起飞</button> <button class="shop-open" id="shopFromEndBtn">打开商店</button></div>
       </div>
       <div class="overlay hide" id="shopOverlay">
-        <div class="card shop-card"><h2>星际商店</h2><p class="shop-subtitle">星星会永久保存。购买后，皮肤可切换，道具可在游戏中使用。</p><div class="wallet">★ <strong id="shopStars">0</strong></div><div class="shop-grid" id="shopGrid"></div><button class="shop-close" id="closeShopBtn">返回</button></div>
+        <div class="card shop-card"><h2>星际商店</h2><p class="shop-subtitle">星星会永久保存。点卡片可预览外观，皮肤买了能换着穿，道具在游戏里点右下角使用。</p><div class="wallet">★ <strong id="shopStars">0</strong></div><div class="shop-preview"><canvas id="preview" width="600" height="210" aria-label="外观预览"></canvas><div class="preview-info"><b id="previewName">极光蓝</b><span id="previewDesc">出厂配色。</span></div></div><div id="shopGrid"></div><button class="shop-close" id="closeShopBtn">返回</button></div>
       </div>
     </section>
-    <div class="tips"><span>电脑：WASD / 方向键 · 手机：屏幕方向键</span><span>暂停：P</span><span>收集晶体 +25 · 撞击 -1 护盾</span></div>
+    <div class="tips"><span>电脑：WASD / 方向键 · 手机：按住屏幕拖动飞船</span><span>暂停：P</span><span>收集晶体 +25 · 撞击 -1 护盾</span></div>
   </main>
 <script>
 (() => {
-  const canvas = document.querySelector('#game'), ctx = canvas.getContext('2d');
+  /* alpha:false：画面每帧都整块重画，不需要透明通道，关掉能省一点手机上的合成开销 */
+  const canvas = document.querySelector('#game'), ctx = canvas.getContext('2d', { alpha:false }), gameWrap = document.querySelector('.game-wrap');
+  const previewCanvas = document.querySelector('#preview'), previewCtx = previewCanvas.getContext('2d');
+  const previewName = document.querySelector('#previewName'), previewDesc = document.querySelector('#previewDesc');
   const scoreEl = document.querySelector('#score'), bestEl = document.querySelector('#best'), livesEl = document.querySelector('#lives');
   const startOverlay = document.querySelector('#startOverlay'), endOverlay = document.querySelector('#endOverlay');
   const shopOverlay = document.querySelector('#shopOverlay'), shopGrid = document.querySelector('#shopGrid');
   const finalScore = document.querySelector('#finalScore'), earnedStarsEl = document.querySelector('#earnedStars'), endTitle = document.querySelector('#endTitle'), endHint = document.querySelector('#endHint');
-  const W = canvas.width, H = canvas.height, keys = new Set();
+  /* W/H 是"游戏世界"的尺寸，会跟着画面形状变（见下面的 resize）。
+     vScale 是竖直方向的换算系数：世界多高，下落速度就乘多少，保证换形状后快慢还是原来的手感。 */
+  let W = canvas.width, H = canvas.height, vScale = 1;
+  const keys = new Set();
   const skinConfigs = {
-    cyan: { name:'极光蓝', body:'#75e8ff', glow:'#4ddaff', window:'#15296b', flame:'#fff3a8' },
-    ruby: { name:'赤焰红', body:'#ff7187', glow:'#ff4d72', window:'#5e163e', flame:'#ffd06b' },
-    gold: { name:'黄金彗星', body:'#ffe477', glow:'#ffb52e', window:'#704c19', flame:'#fff7c2' },
-    nebula: { name:'星云紫', body:'#c69bff', glow:'#a45cff', window:'#321a68', flame:'#a9fff5' }
+    cyan:    { name:'极光蓝',   body:'#75e8ff', glow:'#4ddaff', window:'#15296b', flame:'#fff3a8' },
+    ruby:    { name:'赤焰红',   body:'#ff7187', glow:'#ff4d72', window:'#5e163e', flame:'#ffd06b' },
+    gold:    { name:'黄金彗星', body:'#ffe477', glow:'#ffb52e', window:'#704c19', flame:'#fff7c2' },
+    nebula:  { name:'星云紫',   body:'#c69bff', glow:'#a45cff', window:'#321a68', flame:'#a9fff5' },
+    emerald: { name:'翡翠绿',   body:'#6ff0b0', glow:'#25d98a', window:'#0d4a37', flame:'#e8ffb8' },
+    frost:   { name:'霜白',     body:'#f2f8ff', glow:'#8fd6ff', window:'#3c6a96', flame:'#cfeaff' },
+    shadow:  { name:'暗影紫',   body:'#9b7bff', glow:'#6f3cff', window:'#2a1055', flame:'#d9b8ff' },
+    ember:   { name:'熔岩橙',   body:'#ffa64d', glow:'#ff6a1f', window:'#5c2606', flame:'#ffe89a' }
   };
-  const shopItems = [
-    { id:'ruby', type:'skin', name:'赤焰红皮肤', desc:'像一颗穿过夜空的火流星。', price:35 },
-    { id:'gold', type:'skin', name:'黄金彗星皮肤', desc:'金色飞船，闪耀着财富的光。', price:70 },
-    { id:'nebula', type:'skin', name:'星云紫皮肤', desc:'来自深空的神秘配色。', price:120 },
-    { id:'magnet', type:'item', name:'磁力核心', desc:'使用后持续 8 秒，自动吸引能量晶体。', price:18 },
-    { id:'shield', type:'item', name:'备用护盾', desc:'使用后抵挡下一次陨石撞击。', price:24 },
-    { id:'laser', type:'item', name:'轨道激光', desc:'使用后持续 6 秒，自动摧毁飞船前方的陨石。', price:30 }
+  /* 商店内容：皮肤只改外观，道具真的会影响战局（作用写在 effect 里，商店里直接能看到） */
+  const skinShop = [
+    { id:'cyan',    price:0,   desc:'出厂配色。冷蓝机身配暖色尾焰，像一颗穿过夜空的冰流星。' },
+    { id:'ruby',    price:35,  desc:'火流星配色，尾焰烧得发亮，撞进陨石堆里最扎眼。' },
+    { id:'emerald', price:60,  desc:'深空里长出来的一块翡翠，安静，但是一眼就能认出来。' },
+    { id:'gold',    price:90,  desc:'整艘船镀了金，飞过去会留下一道金粉似的尾迹。' },
+    { id:'nebula',  price:140, desc:'从星云深处带回来的颜色，紫里透青，越看越神秘。' },
+    { id:'frost',   price:200, desc:'机身像结了一层霜，划过的地方都变冷了。' },
+    { id:'shadow',  price:280, desc:'暗紫涂装，混在陨石堆里几乎看不见你在哪。' },
+    { id:'ember',   price:360, desc:'火山口级别的橙，撞哪儿哪儿冒火星。' }
+  ];
+  const itemShop = [
+    { id:'magnet', icon:'🧲', price:18, name:'磁力核心', effect:'用掉之后 8 秒内，附近的能量晶体自己往你身上飞。' },
+    { id:'shield', icon:'🛡️', price:24, name:'备用护盾', effect:'马上多一层护盾，替你白挨一次陨石撞击。' },
+    { id:'laser',  icon:'⚡', price:30, name:'轨道激光', effect:'6 秒内自动打掉正前方的陨石，打掉一个 +10 分。' },
+    { id:'slow',   icon:'🌀', price:26, name:'时间缓流', effect:'6 秒内所有陨石速度减半，躲起来轻松一大截。' },
+    { id:'double', icon:'💎', price:34, name:'双倍得分', effect:'12 秒内得分翻倍，收一颗晶体直接 +50。' },
+    { id:'repair', icon:'❤️', price:45, name:'星尘修复', effect:'立刻补回 1 点护盾，最多补到 3 点。' }
+  ];
+  const shopEntries = [
+    ...skinShop.map(s => ({ id:s.id, price:s.price, desc:s.desc, type:'skin', name:skinConfigs[s.id].name + '·皮肤', owned:s.price===0 })),
+    ...itemShop.map(s => ({ id:s.id, price:s.price, desc:s.effect, icon:s.icon, type:'item', name:s.name }))
   ];
   const readJSON = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; } catch { return fallback; } };
   let stars = Number(localStorage.getItem('meteorDashStars') || 0);
   let ownedSkins = readJSON('meteorDashOwnedSkins', ['cyan']);
-  let inventory = readJSON('meteorDashInventory', { magnet:0, shield:0, laser:0 });
+  const blankInventory = { magnet:0, shield:0, laser:0, slow:0, double:0, repair:0 };
+  let inventory = Object.assign({}, blankInventory, readJSON('meteorDashInventory', {}));   // 老存档少了新道具也不会变 NaN
   let currentSkin = localStorage.getItem('meteorDashSkin') || 'cyan';
   let shopReturn = 'menu', collectedOrbs = 0, earnedStars = 0, shieldCharges = 0;
-  const active = { magnet:0, laser:0 };
+  const active = { magnet:0, laser:0, slow:0, double:0 };
   const powerupButtons = document.querySelectorAll('.item-controls button');
   const difficultyConfigs = {
     easy: { label:'轻松', speed:.78, spawnBase:1.04, spawnScale:1.18, minSpawn:.48, extraChance:0 },
@@ -185,66 +205,150 @@
   bestEl.textContent = best;
   const ship = { x: W/2, y:H-90, r:18, vx:0, vy:0 };
   let meteors = [], orbs = [], particles = [], starfield = [];
-  for (let i=0;i<110;i++) starfield.push({x:Math.random()*W,y:Math.random()*H,z:Math.random()*1.5+.4, tw:Math.random()*6.28});
+  function seedStars() { starfield = []; for (let i=0;i<110;i++) starfield.push({x:Math.random()*W,y:Math.random()*H,z:Math.random()*1.5+.4, tw:Math.random()*6.28}); }
+  seedStars();
   const rnd = (a,b) => a + Math.random()*(b-a);
   const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
   function saveProgress() { localStorage.setItem('meteorDashStars',String(stars)); localStorage.setItem('meteorDashOwnedSkins',JSON.stringify(ownedSkins)); localStorage.setItem('meteorDashInventory',JSON.stringify(inventory)); localStorage.setItem('meteorDashSkin',currentSkin); }
   function updateWallet() {
     document.querySelector('#stars').textContent=`★ ${stars}`; document.querySelector('#menuStars').textContent=stars; document.querySelector('#shopStars').textContent=stars;
-    document.querySelector('#magnetCount').textContent=inventory.magnet; document.querySelector('#shieldCount').textContent=inventory.shield; document.querySelector('#laserCount').textContent=inventory.laser;
+    powerupButtons.forEach(btn=>{ const n=btn.querySelector('span'); if(n) n.textContent=inventory[btn.dataset.use]||0; });
+  }
+  /* ---------- 商店 ---------- */
+  let previewId = currentSkin, previewRAF = 0;
+  function shopCardHTML(item) {
+    const owned = item.type==='skin' && ownedSkins.includes(item.id);
+    const equipped = item.type==='skin' && item.id===currentSkin;
+    const count = item.type==='item' ? (inventory[item.id]||0) : 0;
+    const label = equipped ? '使用中' : (owned ? '装备' : '购买');   // 价格在左边那行写着了，按钮上就不再重复一遍
+    const disabled = equipped || (!owned && stars<item.price);
+    const icon = item.type==='item' ? item.icon : `<i class="dot" style="background:${skinConfigs[item.id].body}"></i>`;
+    const note = item.type==='item' ? `已有 ${count} 个` : (equipped?'正在用':(owned?'已拥有':'还没买'));
+    return `<div class="shop-item${item.id===previewId?' selected':''}" data-card="${item.id}">
+      <div class="shop-head"><span class="shop-icon">${icon}</span><h3>${item.name}</h3></div>
+      <p>${item.desc}</p>
+      <div class="shop-meta"><span>${note}</span><span class="price">${(!owned&&item.price>0)?item.price+'★':''}</span></div>
+      <button data-shop-id="${item.id}" ${disabled?'disabled':''}>${label}</button>
+    </div>`;
   }
   function renderShop() {
-    shopGrid.innerHTML=shopItems.map(item=>{
-      const owned=item.type==='skin' && ownedSkins.includes(item.id), equipped=item.id===currentSkin, count=item.type==='item'?inventory[item.id]:0;
-      let label=item.type==='skin'?(equipped?'使用中':owned?'装备':`购买 · ${item.price}★`):`购买 · ${item.price}★`;
-      const disabled=(item.type==='skin'&&equipped)||(item.type==='item'&&stars<item.price)||(item.type==='skin'&&!owned&&stars<item.price);
-      return `<div class="shop-item"><h3>${item.name}</h3><p>${item.desc}<br>${item.type==='item'?`已有：${count} 个 · `:''}<span class="price">${item.type==='skin'&&owned?'已拥有':`${item.price}★`}</span></p><button data-shop-id="${item.id}" ${disabled?'disabled':''}>${label}</button></div>`;
-    }).join('');
-    shopGrid.querySelectorAll('[data-shop-id]').forEach(btn=>btn.addEventListener('click',()=>buyShopItem(btn.dataset.shopId)));
+    const group = (title, list) => `<div class="shop-group-title">${title}</div><div class="shop-grid">${list.map(shopCardHTML).join('')}</div>`;
+    shopGrid.innerHTML = group('皮肤 · 点卡片先看外观', shopEntries.filter(i=>i.type==='skin'))
+                       + group('道具 · 开局后点右下角使用', shopEntries.filter(i=>i.type==='item'));
+    shopGrid.querySelectorAll('[data-shop-id]').forEach(btn=>btn.addEventListener('click',e=>{ e.stopPropagation(); buyShopItem(btn.dataset.shopId); }));
+    shopGrid.querySelectorAll('[data-card]').forEach(el=>el.addEventListener('click',()=>showPreview(el.dataset.card)));
+    showPreview(previewId);
   }
+  /* 预览窗：皮肤就把飞船画出来（还会上下浮动、尾焰会闪），道具就把图标放大 */
+  function showPreview(id) {
+    previewId = id;
+    const item = shopEntries.find(i=>i.id===id) || shopEntries[0];
+    previewName.textContent = item.type==='skin' ? skinConfigs[item.id].name + ' · 皮肤' : item.name;
+    previewDesc.textContent = item.desc;
+    shopGrid.querySelectorAll('[data-card]').forEach(el=>el.classList.toggle('selected', el.dataset.card===id));
+    if (!previewRAF) previewRAF = requestAnimationFrame(drawPreview);
+  }
+  function drawPreview(now) {
+    const item = shopEntries.find(i=>i.id===previewId);
+    const w = previewCanvas.width, h = previewCanvas.height;
+    previewCtx.clearRect(0,0,w,h);
+    previewCtx.textAlign = 'center'; previewCtx.textBaseline = 'middle';
+    if (item && item.type==='item') {
+      previewCtx.font = '100px system-ui,"Segoe UI Emoji",sans-serif';
+      previewCtx.fillText(item.icon, w/2, h/2);
+    } else {
+      const cfg = skinConfigs[previewId] || skinConfigs.cyan;
+      previewCtx.save();
+      previewCtx.translate(w/2, h/2 + Math.sin(now/420)*7);
+      previewCtx.scale(1.6,1.6);
+      paintShip(previewCtx, cfg);
+      previewCtx.restore();
+    }
+    previewRAF = requestAnimationFrame(drawPreview);
+  }
+  function stopPreview() { cancelAnimationFrame(previewRAF); previewRAF = 0; }
   function buyShopItem(id) {
-    const item=shopItems.find(entry=>entry.id===id); if(!item) return;
-    if(item.type==='skin' && ownedSkins.includes(id)){currentSkin=id;saveProgress();renderShop();return;}
+    const item=shopEntries.find(entry=>entry.id===id); if(!item) return;
+    if(item.type==='skin' && ownedSkins.includes(id)){ currentSkin=id; saveProgress(); renderShop(); return; }
     if(stars<item.price) return;
     stars-=item.price;
     if(item.type==='skin') ownedSkins.push(id); else inventory[id]=(inventory[id]||0)+1;
     saveProgress(); updateWallet(); renderShop();
   }
-  function openShop(returnTo) { shopReturn=returnTo; startOverlay.classList.add('hide'); endOverlay.classList.add('hide'); shopOverlay.classList.remove('hide'); updateWallet(); renderShop(); }
-  function closeShop() { shopOverlay.classList.add('hide'); (shopReturn==='end'?endOverlay:startOverlay).classList.remove('hide'); updateWallet(); }
+  function openShop(returnTo) { shopReturn=returnTo; startOverlay.classList.add('hide'); endOverlay.classList.add('hide'); shopOverlay.classList.remove('hide'); document.documentElement.classList.add('shop-open'); updateWallet(); renderShop(); }
+  function closeShop() { stopPreview(); shopOverlay.classList.add('hide'); document.documentElement.classList.remove('shop-open'); (shopReturn==='end'?endOverlay:startOverlay).classList.remove('hide'); updateWallet(); }
   function updatePowerupUI() { updateWallet(); powerupButtons.forEach(btn=>btn.classList.toggle('active',active[btn.dataset.use]>0)); }
   function usePowerup(id) {
     if(state!=='playing' || !inventory[id]) return;
     inventory[id]--;
     if(id==='magnet') active.magnet=8;
-    if(id==='shield') shieldCharges++;
     if(id==='laser') active.laser=6;
+    if(id==='slow') active.slow=6;
+    if(id==='double') active.double=12;
+    if(id==='shield') shieldCharges++;
+    if(id==='repair'){ lives=Math.min(3,lives+1); livesEl.textContent='♥'.repeat(lives)+'♡'.repeat(3-lives); burst(ship.x,ship.y,'#83ffca',26); }
     saveProgress(); updatePowerupUI();
   }
-  function reset() { score=0; lives=3; elapsed=0; spawn=0; orbSpawn=0; shake=0; collectedOrbs=0; earnedStars=0; shieldCharges=0; active.magnet=0; active.laser=0; meteors=[]; orbs=[]; particles=[]; ship.x=W/2; ship.y=H-90; scoreEl.textContent=0; livesEl.textContent='♥♥♥'; updatePowerupUI(); }
+  function reset() { score=0; lives=3; elapsed=0; spawn=0; orbSpawn=0; shake=0; collectedOrbs=0; earnedStars=0; shieldCharges=0; active.magnet=0; active.laser=0; active.slow=0; active.double=0; meteors=[]; orbs=[]; particles=[]; ship.x=W/2; ship.y=H-90; scoreEl.textContent=0; livesEl.textContent='♥♥♥'; updatePowerupUI(); }
   function burst(x,y,color,n=16) { for(let i=0;i<n;i++) particles.push({x,y,vx:rnd(-140,140),vy:rnd(-140,140),life:rnd(.35,.8),max:.8,color,size:rnd(2,5)}); }
-  function addMeteor() { const cfg=difficultyConfigs[difficulty], r=rnd(14,29), speed=(rnd(95,155)+elapsed*2.4)*cfg.speed; meteors.push({x:rnd(r,W-r),y:-r-10,r,vx:rnd(-28,28),vy:speed,rot:rnd(0,7),spin:rnd(-2,2), hue:rnd(8,30)}); }
-  function addOrb() { orbs.push({x:rnd(30,W-30),y:-20,r:10,vy:rnd(75,115)+elapsed*1.4,pulse:rnd(0,7)}); }
+  function addMeteor() { const cfg=difficultyConfigs[difficulty], r=rnd(14,29), speed=(rnd(95,155)+elapsed*2.4)*cfg.speed*vScale; meteors.push({x:rnd(r,W-r),y:-r-10,r,vx:rnd(-28,28)*W/900,vy:speed,rot:rnd(0,7),spin:rnd(-2,2), hue:rnd(8,30)}); }
+  function addOrb() { orbs.push({x:rnd(30,W-30),y:-20,r:10,vy:(rnd(75,115)+elapsed*1.4)*vScale,pulse:rnd(0,7)}); }
   function hit(a,b) { return Math.hypot(a.x-b.x,a.y-b.y) < a.r+b.r; }
-  function start() { reset(); state='playing'; document.querySelector('.game-wrap').classList.add('playing'); startOverlay.classList.add('hide'); endOverlay.classList.add('hide'); last=performance.now(); requestAnimationFrame(loop); }
-  function finish() { state='ended'; document.querySelector('.game-wrap').classList.remove('playing'); earnedStars=Math.max(1,Math.floor(score/120)+collectedOrbs); stars+=earnedStars; saveProgress(); updateWallet(); best=Math.max(best,score); localStorage.setItem('meteorDashBest',best); bestEl.textContent=best; finalScore.textContent=score; earnedStarsEl.textContent=earnedStars; endTitle.textContent=score>=1000?'星际传奇': '飞船失联'; endHint.textContent=score>=1000?'你已经成为这片星域的传说。':'再来一次，争取冲上排行榜。'; endOverlay.classList.remove('hide'); }
+  /* 让"游戏世界"照着画面长：
+     - 电脑：还是原来的 900×600，一个像素都不变
+     - 手机/平板：世界缩小 1.1 倍（= 屏幕上的一切看起来大 1.1 倍），
+       而且世界的形状始终跟画面一模一样——竖屏就是窄的、横屏就是扁的，怎么转都不会被拉变形。
+     世界变了以后，场上的东西按比例挪过去，转屏/地址栏伸缩时不会全场清空。 */
+  /* 要不要用"手机铺满"那套界面：真触屏，或者"有触摸屏 + 窗口很窄"。
+     两条判断是怕手机上 pointer 判断失灵——那就会退回成中间一小块；
+     加了 maxTouchPoints 这层，电脑上把窗口拉窄也不会误判成手机。 */
+  let touchUI = false;
+  function applyUI() {
+    const next = matchMedia('(pointer:coarse)').matches || matchMedia('(hover:none)').matches
+              || (navigator.maxTouchPoints > 0 && innerWidth <= 820);
+    if (next !== touchUI) { touchUI = next; document.documentElement.classList.toggle('touch-ui', next); }
+  }
+  let lastCW = 0, lastCH = 0;
+  function resize() {
+    applyUI();
+    const rect = canvas.getBoundingClientRect();
+    const cw = Math.round(rect.width), ch = Math.round(rect.height);
+    if (cw < 2 || ch < 2 || (cw === lastCW && ch === lastCH)) return;
+    const oldW = W, oldH = H;
+    lastCW = cw; lastCH = ch;
+    if (touchUI) { W = Math.round(cw / 1.1); H = Math.round(ch / 1.1); }
+    else { W = 900; H = 600; }
+    vScale = H / 600;
+    canvas.width = W; canvas.height = H;
+    const kx = W / oldW, ky = H / oldH;
+    ship.x = clamp(ship.x * kx, 25, W - 25); ship.y = clamp(ship.y * ky, 35, H - 30);
+    meteors.forEach(m=>{ m.x *= kx; m.y *= ky; });
+    orbs.forEach(o=>{ o.x *= kx; o.y *= ky; });
+    if (starfield.length) starfield.forEach(s=>{ s.x *= kx; s.y *= ky; }); else seedStars();
+    if (state !== 'playing') { ship.x = W/2; ship.y = H-90; }
+    draw();
+  }
+  function start() { reset(); state='playing'; gameWrap.classList.add('playing'); startOverlay.classList.add('hide'); endOverlay.classList.add('hide'); last=performance.now(); requestAnimationFrame(loop); }
+  function finish() { state='ended'; gameWrap.classList.remove('playing'); earnedStars=Math.max(1,Math.floor(score/120)+collectedOrbs); stars+=earnedStars; saveProgress(); updateWallet(); best=Math.max(best,Math.floor(score)); localStorage.setItem('meteorDashBest',best); bestEl.textContent=best; finalScore.textContent=Math.floor(score); earnedStarsEl.textContent=earnedStars; endTitle.textContent=score>=1000?'星际传奇': '飞船失联'; endHint.textContent=score>=1000?'你已经成为这片星域的传说。':'再来一次，争取冲上排行榜。'; endOverlay.classList.remove('hide'); }
   function update(dt) {
     if(state!=='playing') return;
-    elapsed += dt; const moveSpeed=320, response=6, cfg=difficultyConfigs[difficulty];
+    elapsed += dt; const moveSpeed=320*W/900, response=6, cfg=difficultyConfigs[difficulty];   // 世界越窄飞船越慢，横穿全屏的时间和电脑上一致
     active.magnet=Math.max(0,active.magnet-dt); active.laser=Math.max(0,active.laser-dt);
+    active.slow=Math.max(0,active.slow-dt); active.double=Math.max(0,active.double-dt);
+    const slowK = active.slow>0 ? .5 : 1, mult = active.double>0 ? 2 : 1;   // 缓流：陨石减半；双倍：所有得分翻倍
     let ax=(keys.has('ArrowRight')||keys.has('d')?1:0)-(keys.has('ArrowLeft')||keys.has('a')?1:0);
     let ay=(keys.has('ArrowDown')||keys.has('s')?1:0)-(keys.has('ArrowUp')||keys.has('w')?1:0);
     ship.vx += (ax*moveSpeed-ship.vx)*Math.min(1,response*dt); ship.vy += (ay*moveSpeed-ship.vy)*Math.min(1,response*dt);
     ship.vx=clamp(ship.vx,-moveSpeed,moveSpeed); ship.vy=clamp(ship.vy,-moveSpeed,moveSpeed); ship.x=clamp(ship.x+ship.vx*dt,25,W-25); ship.y=clamp(ship.y+ship.vy*dt,35,H-30);
     spawn-=dt; orbSpawn-=dt; if(spawn<=0){addMeteor();if(Math.random()<cfg.extraChance)addMeteor();spawn=Math.max(cfg.minSpawn,(cfg.spawnBase-elapsed*.008)*cfg.spawnScale);} if(orbSpawn<=0){addOrb();orbSpawn=rnd(1.2,2.4);}
-    meteors.forEach(m=>{m.x+=m.vx*dt;m.y+=m.vy*dt;m.rot+=m.spin*dt;});
-    orbs.forEach(o=>{if(active.magnet>0){o.x+=(ship.x-o.x)*dt*4.5;o.y+=(ship.y-o.y)*dt*4.5;}o.y+=o.vy*dt;});
-    if(active.laser>0) for(let i=meteors.length-1;i>=0;i--){const m=meteors[i];if(m.y<ship.y&&Math.abs(m.x-ship.x)<m.r+16){meteors.splice(i,1);score+=10;burst(m.x,m.y,'#aefcff',20);}}
+    meteors.forEach(m=>{m.x+=m.vx*dt*slowK;m.y+=m.vy*dt*slowK;m.rot+=m.spin*dt;});
+    orbs.forEach(o=>{if(active.magnet>0){o.x+=(ship.x-o.x)*dt*4.5;o.y+=(ship.y-o.y)*dt*4.5;}o.y+=o.vy*dt*slowK;});
+    if(active.laser>0) for(let i=meteors.length-1;i>=0;i--){const m=meteors[i];if(m.y<ship.y&&Math.abs(m.x-ship.x)<m.r+16){meteors.splice(i,1);score+=10*mult;burst(m.x,m.y,'#aefcff',20);}}
     meteors=meteors.filter(m=>m.y<H+50); orbs=orbs.filter(o=>o.y<H+30);
     for(let i=meteors.length-1;i>=0;i--) if(hit(ship,meteors[i])) { const m=meteors.splice(i,1)[0]; if(shieldCharges>0){shieldCharges--;burst(m.x,m.y,'#83ffca',28);updatePowerupUI();continue;} burst(m.x,m.y,'#ff785f',24); lives--; shake=.3; livesEl.textContent='♥'.repeat(lives)+'♡'.repeat(3-lives); if(lives<=0){finish();return;} }
-    for(let i=orbs.length-1;i>=0;i--) if(hit(ship,orbs[i])) { const o=orbs.splice(i,1)[0]; collectedOrbs++; score+=25; burst(o.x,o.y,'#ffe36e',18); scoreEl.textContent=score; }
-    score += Math.floor(dt*3); scoreEl.textContent=score;
-    particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.97;p.vy*=.97;p.life-=dt;}); particles=particles.filter(p=>p.life>0); shake=Math.max(0,shake-dt);
+    for(let i=orbs.length-1;i>=0;i--) if(hit(ship,orbs[i])) { const o=orbs.splice(i,1)[0]; collectedOrbs++; score+=25*mult; burst(o.x,o.y,'#ffe36e',18); }
+    score += dt*3*mult; scoreEl.textContent=Math.floor(score);   // 撑得越久分越高（原来是 Math.floor(dt*3)，每帧都被抹成 0，等于白算）
+    particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.97;p.vy*=.97;p.life-=dt;}); particles=particles.filter(p=>p.life>0); if(particles.length>240) particles.length=240; shake=Math.max(0,shake-dt);
   }
   function draw() {
     ctx.save(); if(shake) ctx.translate(rnd(-5,5)*shake/.3,rnd(-5,5)*shake/.3);
@@ -255,23 +359,66 @@
     meteors.forEach(m=>{ctx.save();ctx.translate(m.x,m.y);ctx.rotate(m.rot);ctx.shadowBlur=18;ctx.shadowColor='#ff603f88';ctx.fillStyle=`hsl(${m.hue} 90% 62%)`;ctx.beginPath();for(let i=0;i<8;i++){let a=i*Math.PI/4,rr=m.r*rnd(.78,1.14);ctx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr);}ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#8e2d44';ctx.beginPath();ctx.arc(-m.r*.25,-m.r*.1,m.r*.18,0,7);ctx.fill();ctx.restore();});
     if(active.laser>0){ctx.save();ctx.globalAlpha=.7;ctx.strokeStyle='#aefcff';ctx.shadowBlur=18;ctx.shadowColor='#57f4ff';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(ship.x,ship.y-16);ctx.lineTo(ship.x,0);ctx.stroke();ctx.globalAlpha=.95;ctx.strokeStyle='#ffffff';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(ship.x,ship.y-16);ctx.lineTo(ship.x,0);ctx.stroke();ctx.restore();}
     particles.forEach(p=>{ctx.globalAlpha=Math.max(0,p.life/p.max);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,7);ctx.fill();});ctx.globalAlpha=1;
-    const skin=skinConfigs[currentSkin]||skinConfigs.cyan; ctx.save();ctx.translate(ship.x,ship.y);const glow=ctx.createRadialGradient(0,0,2,0,0,38);glow.addColorStop(0,skin.glow+'88');glow.addColorStop(1,'#32bfff00');ctx.fillStyle=glow;ctx.beginPath();ctx.arc(0,0,40,0,7);ctx.fill();ctx.shadowBlur=18;ctx.shadowColor=skin.glow;ctx.fillStyle=skin.body;ctx.beginPath();ctx.moveTo(0,-23);ctx.lineTo(17,17);ctx.lineTo(0,11);ctx.lineTo(-17,17);ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.fillStyle=skin.window;ctx.beginPath();ctx.ellipse(0,-6,7,10,0,0,7);ctx.fill();ctx.fillStyle=skin.flame;ctx.beginPath();ctx.moveTo(-5,17);ctx.lineTo(0,29+rnd(0,5));ctx.lineTo(5,17);ctx.closePath();ctx.fill();ctx.restore();ctx.restore();
+    const skin=skinConfigs[currentSkin]||skinConfigs.cyan; ctx.save();ctx.translate(ship.x,ship.y);paintShip(ctx,skin);ctx.restore();
+    /* 生效中的增益，压在画面最上面提示一下（缓流/双倍/护盾） */
+    const badges=[];
+    if(active.slow>0) badges.push(['🌀 缓流 '+Math.ceil(active.slow)+'s','#8fe3ff']);
+    if(active.double>0) badges.push(['💎 双倍 '+Math.ceil(active.double)+'s','#ffe08a']);
+    if(shieldCharges>0) badges.push(['🛡️ '+shieldCharges+' 层','#83ffca']);
+    if(badges.length){
+      ctx.font='13px system-ui,"Segoe UI Emoji",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      badges.forEach((b,i)=>{
+        const x=W/2+(i-(badges.length-1)/2)*92, y=20;
+        ctx.fillStyle='#0a1330ee'; ctx.fillRect(x-44,y-11,88,22);
+        ctx.strokeStyle=b[1]+'99'; ctx.lineWidth=1; ctx.strokeRect(x-44.5,y-11.5,89,23);
+        ctx.fillStyle=b[1]; ctx.fillText(b[0],x,y);
+      });
+    }
+    ctx.restore();
   }
-  function loop(now){const dt=Math.min(.035,(now-last)/1000);last=now;update(dt);draw();if(state==='playing')requestAnimationFrame(loop);}
+  /* 画一艘朝上的飞船，(0,0) 是船心。游戏画面和商店预览共用这一份，改配色两边一起变 */
+  function paintShip(g, skin) {
+    const glow=g.createRadialGradient(0,0,2,0,0,38);
+    glow.addColorStop(0,skin.glow+'88'); glow.addColorStop(1,'#32bfff00');
+    g.fillStyle=glow; g.beginPath(); g.arc(0,0,40,0,7); g.fill();
+    g.shadowBlur=18; g.shadowColor=skin.glow; g.fillStyle=skin.body;
+    g.beginPath(); g.moveTo(0,-23); g.lineTo(17,17); g.lineTo(0,11); g.lineTo(-17,17); g.closePath(); g.fill();
+    g.shadowBlur=0; g.fillStyle=skin.window; g.beginPath(); g.ellipse(0,-6,7,10,0,0,7); g.fill();
+    g.fillStyle=skin.flame; g.beginPath(); g.moveTo(-5,17); g.lineTo(0,29+rnd(0,5)); g.lineTo(5,17); g.closePath(); g.fill();
+  }
+  function loop(now){const dt=Math.max(0,Math.min(.035,(now-last)/1000));last=now;update(dt);draw();if(state==='playing')requestAnimationFrame(loop);}   // Math.max(0,…)：第一帧的时间戳偶尔比 last 早，不挡一下分数会从 -1 开始
   document.querySelector('#startBtn').onclick=start; document.querySelector('#againBtn').onclick=start;
   document.querySelector('#shopBtn').onclick=()=>openShop('menu'); document.querySelector('#shopFromEndBtn').onclick=()=>openShop('end'); document.querySelector('#closeShopBtn').onclick=closeShop;
   document.querySelectorAll('.difficulty-btn').forEach(btn=>btn.addEventListener('click',()=>{difficulty=btn.dataset.difficulty;document.querySelectorAll('.difficulty-btn').forEach(b=>b.classList.toggle('selected',b===btn));}));
   powerupButtons.forEach(btn=>btn.addEventListener('click',()=>usePowerup(btn.dataset.use)));
-  document.querySelectorAll('.touch-controls button').forEach(btn=>{
-    const key=btn.dataset.key;
-    const press=e=>{e.preventDefault();btn.setPointerCapture?.(e.pointerId);btn.classList.add('active');keys.add(key);};
-    const release=e=>{e.preventDefault();btn.classList.remove('active');keys.delete(key);};
-    btn.addEventListener('pointerdown',press); btn.addEventListener('pointerup',release); btn.addEventListener('pointercancel',release); btn.addEventListener('lostpointercapture',release);
+  /* 手机操作：手指按住屏幕拖动，飞船跟着手指走。
+     用的是"相对拖动"——按下去的那一下飞船不会瞬移到手指底下，而是跟着手指移动多少走多少。
+     鼠标不参与（pointerType==='mouse' 直接放过），所以电脑上还是老样子，只用键盘。 */
+  let drag = null;
+  gameWrap.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' || state !== 'playing') return;
+    if (e.target.closest('button')) return;                 // 点道具键不算拖动
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: ship.x, sy: ship.y };
+    gameWrap.setPointerCapture?.(e.pointerId);
+    e.preventDefault();
   });
+  gameWrap.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const k = W / canvas.getBoundingClientRect().width;     // 屏幕上的像素 → 游戏世界里的距离
+    ship.x = clamp(drag.sx + (e.clientX - drag.x) * k, 25, W - 25);
+    ship.y = clamp(drag.sy + (e.clientY - drag.y) * k, 35, H - 30);
+    ship.vx = 0; ship.vy = 0;
+    e.preventDefault();
+  });
+  const stopDrag = e => { if (drag && e.pointerId === drag.id) drag = null; };
+  gameWrap.addEventListener('pointerup', stopDrag);
+  gameWrap.addEventListener('pointercancel', stopDrag);
   window.addEventListener('keydown',e=>{const k=e.key.length===1?e.key.toLowerCase():e.key;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();if(k==='1')usePowerup('magnet');if(k==='2')usePowerup('shield');if(k==='3')usePowerup('laser');if(k==='p'&&state!=='menu'&&state!=='ended'){state=state==='playing'?'paused':'playing';if(state==='playing'){last=performance.now();requestAnimationFrame(loop);}}keys.add(k);});
   window.addEventListener('keyup',e=>keys.delete(e.key.length===1?e.key.toLowerCase():e.key));
   updateWallet();
-  draw();
+  addEventListener('resize', resize);
+  addEventListener('orientationchange', () => setTimeout(resize, 300));   // 转屏时浏览器改尺寸有延迟，等它改完再量
+  resize();
 })();
 </script>
 </body>
